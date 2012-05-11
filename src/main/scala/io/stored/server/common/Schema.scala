@@ -4,7 +4,7 @@ import org.json.JSONObject
 import collection.mutable.HashMap
 
 
-class Schema(dimensions: Int, fields: Map[String, SchemaField]) {
+class Schema(val dimensions: Int, val fields: Map[String, SchemaField]) {
 
 }
 
