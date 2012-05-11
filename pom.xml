@@ -34,6 +34,11 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.almworks.sqlite4java</groupId>
+      <artifactId>sqlite4java</artifactId>
+      <version>0.282</version>
+    </dependency>
+    <dependency>
       <groupId>io.viper</groupId>
       <artifactId>io.viper.core</artifactId>
       <version>0.1.1-SNAPSHOT</version>
