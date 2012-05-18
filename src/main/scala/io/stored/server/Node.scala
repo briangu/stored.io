@@ -143,7 +143,7 @@ object Node {
           }
         })
 
-        post("/records/query", new RouteHandler {
+        post("/records/queries", new RouteHandler {
           def exec(args: java.util.Map[String, String]): RouteResponse = {
             if (!args.containsKey("sql")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
             val sql = args.get("sql")

@@ -1,26 +1,53 @@
-{
-  "color": "red",
-  "year": "1995",
-  "model": "mustang",
-  "manufacturer": "ford",
-  "mileage": 75000,
-  "field1": val1,
-  "field2": val1,
-  "field3": val1
-}
 
-==>
+Examples
+========
 
-{
-  "color": h0,
-  "year": h1,
-  "model": h2,
-  "manufacturer": h3,
-  "mileage": h4,
-  "field1": val1,
-  "field2": val1,
-  "field3": val1
-}
+Add data to the store:
+
+record.json
+
+    {
+      "color": "red",
+      "year": "1995",
+      "model": "mustang",
+      "manufacturer": "ford",
+      "mileage": 75000,
+      "field1": val1,
+      "field2": val1,
+      "field3": val1
+    }
+
+    curl -d@record.json http://localhost:8080/records
+
+Query data from the store:
+
+    curl -d'sql=select * from data_index' http://localhost:8080/records/queries
+
+
+
+    {
+      "color": "red",
+      "year": "1995",
+      "model": "mustang",
+      "manufacturer": "ford",
+      "mileage": 75000,
+      "field1": val1,
+      "field2": val1,
+      "field3": val1
+    }
+
+    ==>
+
+    {
+      "color": h0,
+      "year": h1,
+      "model": h2,
+      "manufacturer": h3,
+      "mileage": h4,
+      "field1": val1,
+      "field2": val1,
+      "field3": val1
+    }
 
 choices for auto-field mapping:
   sorting (can't deal well with new inserted fields)
