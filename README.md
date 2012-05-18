@@ -23,7 +23,11 @@ Query data from the store:
 
     curl -d'sql=select * from data_index' http://localhost:8080/records/queries
 
+    {"elements":[{"model":"mustang","field3":"val1","mileage":75000,"field2":"val1","color":"red","manufacturer":"ford","year":"1995","field1":"val1"}]}
 
+
+Internals
+=========
 
     {
       "color": "red",
@@ -49,71 +53,52 @@ Query data from the store:
       "field3": val1
     }
 
-choices for auto-field mapping:
-  sorting (can't deal well with new inserted fields)
-  first come first serve, downside is each node may have a different mapping
-  fixed mapping at the config level
-goal: consistent mapping across nodes, automatically
-  agreement via zk
-  in localmode, singleton
 
-how do we deal with value types?
-dynamically add columns? alter scripts.
+Schema Config
+=============
 
-extract field path as column name
-add column if not present: http://sqlite.org/lang_altertable.html
-
-
-{
-  "dimensions": 12,
-  "fields": {
-    "color": 3,
-    "year": 3,
-    "model": 2,
-    "manufacturer": 2,
-    "mileage": 2
-  }
-}
-
-
-
-{
-  "fields": {
-    "color": {
-      "alg": "md5",
-      "weight": 3
-    },
-    "year": {
-      "alg": "md5",
-      "weight": 3
-    },
-    "model": {
-      "alg": "md5",
-      "weight": 2
-    },
-    "manufacturer": {
-      "alg": "md5",
-      "weight": 2
-    },
-    "mileage": {
-      "alg": "md5",
-      "weight": 2
+    {
+      "dimensions": 12,
+      "fields": {
+        "color": 3,
+        "year": 3,
+        "model": 2,
+        "manufacturer": 2,
+        "mileage": 2
+      }
     }
-  }
-}
 
 
-field map
-  field hash functions
-  field names -> bitwidth
+Possibly fancier config:
 
-dynamic field association to fixed sql fields in db
+    {
+      "fields": {
+        "color": {
+          "alg": "md5",
+          "weight": 3
+        },
+        "year": {
+          "alg": "md5",
+          "weight": 3
+        },
+        "model": {
+          "alg": "md5",
+          "weight": 2
+        },
+        "manufacturer": {
+          "alg": "md5",
+          "weight": 2
+        },
+        "mileage": {
+          "alg": "md5",
+          "weight": 2
+        }
+      }
+    }
 
-
-dimensions
-
+Todo
+====
 
 machine map
   localhost
   via zookeepr
-  machine mapping?
