@@ -1,0 +1,10 @@
+record={
+  "color": "red",
+  "year": "1995",
+  "model": "mustang",
+  "manufacturer": "ford",
+  "mileage": 75000,
+  "field1": val1,
+  "field2": val1,
+  "field3": val1
+}

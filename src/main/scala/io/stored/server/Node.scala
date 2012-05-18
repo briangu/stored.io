@@ -1,17 +1,19 @@
 package io.stored.server
 
 import _root_.io.viper.core.server.router._
-import common.Schema
+import common.{Record, IndexStorage, Schema}
 import io.viper.common.{NestServer, RestServer}
 import org.jboss.netty.handler.codec.http.HttpResponseStatus
 import org.json.JSONObject
-import java.util.Map
-import collection.mutable.HashSet
 import java.security.MessageDigest
-import com.sun.org.apache.xerces.internal.impl.dv.util.HexBin
+import collection.mutable.{HashMap, HashSet}
+import io.stored.common.FileUtil
+import io.stored.server.storage.H2IndexStorage
 
 
-class Node(val ids: Set[Int], val schema: Schema) {
+class Node(val localhost: String, val ids: Set[Int], val schema: Schema) {
+
+  val storage : IndexStorage = new H2IndexStorage
 
 }
 
@@ -19,16 +21,12 @@ object Node {
 
   var node: Node = null
 
-  def flatten(jsonData: JSONObject) : Map[String, AnyRef] = {
-    null
-  }
-
   def getNodeId(hashCoords: Map[String, Array[Byte]], schema: Schema) : Int = {
     0
   }
 
-  def getTargetNodeIdFromData(data: Map[String, AnyRef], schema: Schema) : Int = {
-    val hashCoords = hashSchemaFields(data, schema)
+  def getTargetNodeId(data: Map[String, AnyRef], schema: Schema) : Int = {
+//    val hashCoords = hashSchemaFields(data, schema)
     0
   }
 
@@ -36,41 +34,36 @@ object Node {
     null
   }
 
-  def ensureColumnsExist(data: Map[String, String]) {
-
-  }
-
-  def indexData(nodeId: Int, data: Map[String, AnyRef], rawData: String) {
+  def indexRecord(nodeId: Int, record: Record) {
     if (node.ids.contains(nodeId)) {
-      storeData(data, rawData)
+      indexRecord(record)
     } else {
-      storeData(findNodeHost(nodeId), data, rawData)
+      indexRecord(findNodeHost(nodeId), record)
     }
   }
 
-  def storeData(host: String, data: Map[String, AnyRef], rawData: String) {
+  def indexRecord(host: String, record: Record) {
 
   }
 
-  def storeData(data: Map[String, AnyRef], rawData: String) {
-    //ensureColumnsExist(data)
-    // can be done implicitly as we fill out the write request
+  def indexRecord(record: Record) {
+    node.storage.add(record)
   }
 
   def findNodeHost(nodeId: Int) : String = {
-    null
+    node.localhost
   }
 
   def determineNodeIds(dimensions: Int) : Set[Int] = {
     val ids = new HashSet[Int]
-    for (x <- 0 until math.pow(2, dimensions)) ids.add(x)
+    for (x <- 0 until math.pow(2, dimensions).toInt) ids.add(x)
     ids.toSet
   }
 
-  def md5Hash(datum: Array[Byte]) : BigInt = {
+  def md5Hash(Record: Array[Byte]) : BigInt = {
     val m = MessageDigest.getInstance("MD5");
     m.reset();
-    m.update(datum);
+    m.update(Record);
     val digest = m.digest();
     BigInt.apply(digest)
   }
@@ -95,11 +88,28 @@ object Node {
     null
   }
 
+  def initializeDb(storagePath: String, nodeIds: Array[Int]) {
+
+  }
+
+  def initialize(localhost: String, schemaFile: String, storagePath: String) {
+    val schema = Schema.create(FileUtil.readJson(schemaFile))
+    node = new Node(localhost, determineNodeIds(schema.dimensions), schema)
+    node.storage.init(storagePath, node.ids)
+  }
+
   def main(args: Array[String]) {
+
+    val schemaFile = args(0)
+    val storagePath = args(1)
+
+    initialize("http://localhost:8080", schemaFile, storagePath)
+
     NestServer.run(8080, new RestServer {
       def addRoutes {
+/*
         post("/schema", new RouteHandler {
-          def exec(args: Map[String, String]): RouteResponse = {
+          def exec(args: java.util.Map[String, String]): RouteResponse = {
             if (!args.containsKey("schema")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
             val schema = Schema.create(new JSONObject(args.get("schema")))
             node = new Node(determineNodeIds(schema.dimensions), schema)
@@ -108,52 +118,59 @@ object Node {
         })
 
         get("/schema", new RouteHandler {
-          def exec(args: Map[String, String]) = new JsonResponse(new JSONObject())
+          def exec(args: java.util.Map[String, String]) = new JsonResponse(new JSONObject())
         })
+*/
 
         // transform map into flat namespace map
         // perform hyperspace hashing on named fields using schema reference
-        // store datum into table
+        // store Record into table
         //  ensure all flattened field names exist using db schema reference
         //
         // determine which shard node to use from hash coords
         //  in the localhost case, we hold all shards on one Node
         //  in the multi-node case, we'd have to forward the request to teh appropriate node based on hashCoords
         //
-        post("/index", new RouteHandler {
-          def exec(args: Map[String, String]): RouteResponse = {
-            if (!args.containsKey("data")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
-            val rawData = args.get("data")
-            val data = flatten(new JSONObject(rawData))
-            val nodeId = getTargetNodeIdFromData(data, node.schema)
-            indexData(nodeId, data, rawData)
-            new StatusResponse(HttpResponseStatus.OK)
+        post("/records", new RouteHandler {
+          def exec(args: java.util.Map[String, String]): RouteResponse = {
+            if (!args.containsKey("record")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+            val record = Record.create(args.get("record"))
+            val nodeId = getTargetNodeId(record.colMap, node.schema)
+            indexRecord(nodeId, record)
+            val response = new JSONObject();
+            response.put("id", record.id)
+            new JsonResponse(response)
           }
         })
 
-        get("/index/$query", new RouteHandler {
-          def exec(args: Map[String, String]) = new JsonResponse(new JSONObject())
+        get("/records/$sql", new RouteHandler {
+          def exec(args: java.util.Map[String, String]) = {
+
+            new JsonResponse(new JSONObject())
+          }
         })
 
+/*
         post("/data", new RouteHandler {
-          def exec(args: Map[String, String]): RouteResponse = {
+          def exec(args: java.util.Map[String, String]): RouteResponse = {
             if (!args.containsKey("data")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
             val rawData = args.get("data")
             val hash = getDataHash(rawData)
             val nodeId = getNBits(hash, node.schema.dimensions)
-            storeData(nodeId, rawData)
+            indexRecord(nodeId, rawData)
             new StatusResponse(HttpResponseStatus.OK)
           }
         })
 
         get("/data/$hash", new RouteHandler {
-          def exec(args: Map[String, String]) = {
+          def exec(args: java.util.Map[String, String]) = {
             val hash = args.get("hash")
             val nodeId = getNBits(HexBin.decode(hash), node.schema.dimensions)
             val data = getData(nodeId, hash)
             new JsonResponse(new JSONObject(data))
           }
         })
+*/
       }
     })
   }
