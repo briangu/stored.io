@@ -4,11 +4,11 @@ import _root_.io.viper.core.server.router._
 import common.{Record, IndexStorage, Schema}
 import io.viper.common.{NestServer, RestServer}
 import org.jboss.netty.handler.codec.http.HttpResponseStatus
-import org.json.JSONObject
 import java.security.MessageDigest
-import collection.mutable.{HashMap, HashSet}
+import collection.mutable.{HashSet}
 import io.stored.common.FileUtil
 import io.stored.server.storage.H2IndexStorage
+import org.json.{JSONArray, JSONObject}
 
 
 class Node(val localhost: String, val ids: Set[Int], val schema: Schema) {
@@ -143,10 +143,16 @@ object Node {
           }
         })
 
-        get("/records/$sql", new RouteHandler {
-          def exec(args: java.util.Map[String, String]) = {
-
-            new JsonResponse(new JSONObject())
+        post("/records/query", new RouteHandler {
+          def exec(args: java.util.Map[String, String]): RouteResponse = {
+            if (!args.containsKey("sql")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+            val sql = args.get("sql")
+            val results = node.storage.query(sql)
+            val jsonResponse = new JSONObject()
+            val elements = new JSONArray()
+            results.foreach{ record => { elements.put( record.rawData) }}
+            jsonResponse.put("elements", elements)
+            new JsonResponse(jsonResponse)
           }
         })
 
