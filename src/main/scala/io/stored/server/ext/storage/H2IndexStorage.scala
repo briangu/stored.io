@@ -2,7 +2,6 @@ package io.stored.server.storage
 
 import org.apache.log4j.Logger
 import org.h2.jdbcx.JdbcConnectionPool
-import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import java.io.File
@@ -42,6 +41,30 @@ class H2IndexStorage extends IndexStorage {
     _cp = JdbcConnectionPool.create(createConnectionString, "sa", "sa")
     val file: File = new File(getDbFile + ".h2.db")
     if (!file.exists) bootstrapDb
+
+    loadColumnNames()
+  }
+
+  def loadColumnNames() {
+    var db: Connection = null
+    var st: Statement = null
+    try {
+      db = getDbConnection
+
+      val rs: ResultSet = db.getMetaData.getColumns(null, null, _tableName, null)
+      while (rs.next) {
+        _tableColumns.add(rs.getString(4))
+      }
+    }
+    catch {
+      case e: SQLException => {
+        H2IndexStorage.log.error(e)
+      }
+    }
+    finally {
+      SqlUtil.SafeClose(st)
+      SqlUtil.SafeClose(db)
+    }
   }
 
   def shutdown {
@@ -149,7 +172,8 @@ class H2IndexStorage extends IndexStorage {
         List.fill(cols.size)("?").mkString(","))
 
       colMap.keySet.foreach{ colName => {
-        if (!_tableColumns.contains(colName)) createColumn(db, tableName, colName, colMap.get(colName).get)
+        val upColName = colName.toUpperCase
+        if (!_tableColumns.contains(upColName)) createColumn(db, tableName, upColName, colMap.get(colName).get)
       }}
 
       statement = db.prepareStatement(sql)

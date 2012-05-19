@@ -17,7 +17,7 @@ object Record {
       val refPath = "%s%s".format(path, key)
       val ref = jsonData.get(key)
       if (ref.isInstanceOf[JSONObject]) {
-        flatten(ref.asInstanceOf[JSONObject], refPath + ".", map)
+        flatten(ref.asInstanceOf[JSONObject], refPath + "_", map)
       } else {
         map.put(refPath, ref)
       }
