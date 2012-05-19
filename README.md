@@ -67,6 +67,8 @@ Everytime you add new data to the system, columns will automatically be created 
 Internals
 =========
 
+This section will contain detailed info on how the distributed nature of store-d works.
+
     {
       "color": "red",
       "year": "1995",
