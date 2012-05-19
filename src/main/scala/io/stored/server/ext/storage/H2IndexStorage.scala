@@ -12,6 +12,12 @@ import collection.mutable.{ListBuffer, SynchronizedSet, HashSet}
 
 object H2IndexStorage {
   private val log: Logger = Logger.getLogger(classOf[H2IndexStorage])
+
+  def create(configRoot: String, nodeId : Int) : H2IndexStorage = {
+    val storage = new H2IndexStorage
+    storage.init(configRoot, nodeId)
+    storage
+  }
 }
 
 class H2IndexStorage extends IndexStorage {
@@ -19,11 +25,11 @@ class H2IndexStorage extends IndexStorage {
   private val _tableName = "DATA_INDEX"
 
   private var _configRoot: String = null
-  private var _nodeIds: Set[Int] = null
+  private var _nodeId: Int = 0
   private var _cp: JdbcConnectionPool = null
   private var _tableColumns = new HashSet[String] with SynchronizedSet[String]
 
-  private def getDbFile: String = "%s%sindex".format(_configRoot, File.separator)
+  private def getDbFile: String = _configRoot + File.separator + "index_" + _nodeId
   private def createConnectionString: String = "jdbc:h2:%s".format(getDbFile)
   private def getDbConnection: Connection = _cp.getConnection
 
@@ -33,21 +39,22 @@ class H2IndexStorage extends IndexStorage {
     conn
   }
 
-  def init(configRoot: String, nodeIds : Set[Int]) {
+  def init(configRoot: String, nodeId : Int) {
     _configRoot = configRoot
-    _nodeIds = nodeIds
+    _nodeId = nodeId
 
     Class.forName("org.h2.Driver")
     _cp = JdbcConnectionPool.create(createConnectionString, "sa", "sa")
     val file: File = new File(getDbFile + ".h2.db")
     if (!file.exists) bootstrapDb
 
-    loadColumnNames()
+    loadColumnNames
   }
 
-  def loadColumnNames() {
+  def loadColumnNames {
     var db: Connection = null
     var st: Statement = null
+
     try {
       db = getDbConnection
 
@@ -143,7 +150,7 @@ class H2IndexStorage extends IndexStorage {
           var sql = "ALTER TABLE %s ADD %s %s".format(tableName, colName, colType)
 
           statement = db.prepareStatement(sql)
-          statement.execute()
+          statement.execute
 
           _tableColumns.add(colName)
         } catch {
@@ -294,10 +301,18 @@ class H2IndexStorage extends IndexStorage {
     }
   }
 
+  /***
+   * Build a query from a filter description.
+   *
+   * @param filter
+   * @return
+   */
   def query(filter: JSONObject) : List[Record] = {
     null
   }
 
+  // BUG: if sql is not select * then we may not get HASH,RAWDATA back
+  // TODO: we should really be building our queries for the caller so they dont need to know the inner details
   def query(sql: String): List[Record] = {
     val results = new ListBuffer[Record]
 

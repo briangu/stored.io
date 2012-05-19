@@ -5,15 +5,16 @@ import common.{Record, IndexStorage, Schema}
 import io.viper.common.{NestServer, RestServer}
 import org.jboss.netty.handler.codec.http.HttpResponseStatus
 import java.security.MessageDigest
-import collection.mutable.{HashSet}
 import io.stored.common.FileUtil
-import io.stored.server.storage.H2IndexStorage
 import org.json.{JSONArray, JSONObject}
+import collection.immutable.HashMap
+import io.stored.server.storage.H2IndexStorage
+import collection.mutable.{SynchronizedBuffer, ListBuffer, SynchronizedMap, HashSet}
 
 
 class Node(val localhost: String, val ids: Set[Int], val schema: Schema) {
 
-  val storage : IndexStorage = new H2IndexStorage
+  val storage = new HashMap[Int, IndexStorage] with SynchronizedMap[Int, IndexStorage]
 
 }
 
@@ -30,13 +31,21 @@ object Node {
     0
   }
 
+  def getTargetNodeIds(sql: String) : Set[Int] = {
+    null
+  }
+
+  def getTargetHosts(nodeIds: Set[Int]) : Map[String, Set[Int]] = {
+    null
+  }
+
   def hashSchemaFields(data: Map[String, AnyRef], schema: Schema) : Map[String, Array[Byte]] = {
     null
   }
 
   def indexRecord(nodeId: Int, record: Record) {
     if (node.ids.contains(nodeId)) {
-      indexRecord(record)
+      node.storage.get(nodeId).get.add(record)
     } else {
       indexRecord(findNodeHost(nodeId), record)
     }
@@ -47,7 +56,6 @@ object Node {
   }
 
   def indexRecord(record: Record) {
-    node.storage.add(record)
   }
 
   def findNodeHost(nodeId: Int) : String = {
@@ -95,7 +103,16 @@ object Node {
   def initialize(localhost: String, schemaFile: String, storagePath: String) {
     val schema = Schema.create(FileUtil.readJson(schemaFile))
     node = new Node(localhost, determineNodeIds(schema.dimensions), schema)
-    node.storage.init(storagePath, node.ids)
+    node.ids.par.foreach(id => node.storage.put(id, H2IndexStorage.create(storagePath, id)))
+  }
+
+  def queryHost(host: String, nodeIds: Set[Int], sql: String) : Map[Int, List[Record]] = {
+    val resultMap = new HashMap[Int, List[Record]] with SynchronizedMap[Int, List[Record]]
+    host match {
+      case node.localhost => nodeIds.par.foreach(id => resultMap.put(id, node.storage.get(id).get.query(sql)))
+      case _ => throw new RuntimeException("not yet supported")
+    }
+    resultMap.toMap
   }
 
   def main(args: Array[String]) {
@@ -107,21 +124,6 @@ object Node {
 
     NestServer.run(8080, new RestServer {
       def addRoutes {
-/*
-        post("/schema", new RouteHandler {
-          def exec(args: java.util.Map[String, String]): RouteResponse = {
-            if (!args.containsKey("schema")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
-            val schema = Schema.create(new JSONObject(args.get("schema")))
-            node = new Node(determineNodeIds(schema.dimensions), schema)
-            new StatusResponse(HttpResponseStatus.OK)
-          }
-        })
-
-        get("/schema", new RouteHandler {
-          def exec(args: java.util.Map[String, String]) = new JsonResponse(new JSONObject())
-        })
-*/
-
         // transform map into flat namespace map
         // perform hyperspace hashing on named fields using schema reference
         // store Record into table
@@ -147,7 +149,21 @@ object Node {
           def exec(args: java.util.Map[String, String]): RouteResponse = {
             if (!args.containsKey("sql")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
             val sql = args.get("sql")
-            val results = node.storage.query(sql)
+
+            val nodeIds = getTargetNodeIds(sql)
+            val hostsMap = getTargetHosts(nodeIds)
+
+            // TODO: rewrite sql for node queries, as it's almost certain what we want to sub query is not the same
+            //val resultMap = new HashMap[String, Map[Int, List[Record]]] with SynchronizedMap[String, Map[Int, List[Record]]]
+//            hostsMap.keySet.par.foreach(host => resultMap.put(host, queryHost(host, hostsMap.get(host).get, sql)))
+
+            // combine results and TODO: apply original sql
+            val results = new ListBuffer[Record] with SynchronizedBuffer[Record]
+            hostsMap.keySet.par.foreach(host => {
+              val hostResults = queryHost(host, hostsMap.get(host).get, sql)
+              hostResults.keys.par.foreach(id => results.appendAll(hostResults.get(id).get))
+            })
+
             val jsonResponse = new JSONObject()
             val elements = new JSONArray()
             results.foreach{ record => { elements.put( record.rawData) }}
@@ -156,30 +172,26 @@ object Node {
           }
         })
 
-/*
-        post("/data", new RouteHandler {
+        post("/records/queries/nodes/$node", new RouteHandler {
           def exec(args: java.util.Map[String, String]): RouteResponse = {
-            if (!args.containsKey("data")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
-            val rawData = args.get("data")
-            val hash = getDataHash(rawData)
-            val nodeId = getNBits(hash, node.schema.dimensions)
-            indexRecord(nodeId, rawData)
-            new StatusResponse(HttpResponseStatus.OK)
-          }
-        })
+            if (!args.containsKey("sql")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+            if (!args.containsKey("node")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+            val sql = args.get("sql")
+            val nodeId = args.get("node").toInt
 
-        get("/data/$hash", new RouteHandler {
-          def exec(args: java.util.Map[String, String]) = {
-            val hash = args.get("hash")
-            val nodeId = getNBits(HexBin.decode(hash), node.schema.dimensions)
-            val data = getData(nodeId, hash)
-            new JsonResponse(new JSONObject(data))
+            if (!node.storage.contains(nodeId)) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+
+            val results = node.storage.get(nodeId).get.query(sql)
+
+            val jsonResponse = new JSONObject()
+            val elements = new JSONArray()
+            results.foreach{ record => { elements.put( record.rawData) }}
+            jsonResponse.put("elements", elements)
+            new JsonResponse(jsonResponse)
           }
         })
-*/
-      }
-    })
-  }
+    }
+  })
 }
 
 

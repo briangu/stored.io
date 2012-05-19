@@ -1,7 +1,8 @@
 Summary
 =======
 
-Store-D is a distributed SQL storage system that uses hyperspace hashing projected with hypercube addressing.
+Store-D is a schema-less JSON store that supports native SQL over dynamically added columns.
+It is also a distributed SQL storage system that uses hyperspace hashing and hypercube addressing schemes.
 
 From a developer's perspective, it is a schema-less JSON store that supports native SQL.
 
