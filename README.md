@@ -15,7 +15,7 @@ The general design is inspired by several well-known and lesser-known systems:
     Mongo
     CM-2 (Connection Machine 2)
 
-    Some of the principles align very well with OLAP
+Some of the principles align very well with OLAP
 
 Usage
 =====
@@ -28,9 +28,9 @@ Subsquently, the developer can use any key path in a SQL statement.
 Examples
 ========
 
-Add data to the store:
+The following example shows how to add data and query it back out.  Notice, no table schemas were defined!
 
-record.json
+create a file called record.json
 
     {
       "color": "red",
@@ -50,6 +50,8 @@ record.json
       }
     }
 
+Add data to the store:
+
     curl -d@record.json http://localhost:8080/records
 
 Query data from the store using plain-old-sql:
@@ -60,11 +62,7 @@ or
 
     curl --data-urlencode "sql=select * from data_index where seat_safety_rating = 5" http://localhost:8080/records/queries
 
-
-Response:
-
-    {"elements":[{"model":"mustang","field3":"val1","mileage":75000,"field2":"val1","color":"red","manufacturer":"ford","year":"1995","field1":"val1"}]}
-
+Everytime you add new data to the system, columns will automatically be created for you.
 
 Internals
 =========
