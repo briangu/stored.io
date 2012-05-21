@@ -4,7 +4,7 @@ import org.json.JSONObject
 
 
 trait IndexStorage {
-  def init(configRoot: String, nodeId : Int)
+  def init(configRoot: String)
   def shutdown()
 
   def purge()

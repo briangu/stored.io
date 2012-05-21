@@ -13,9 +13,9 @@ import collection.mutable.{ListBuffer, SynchronizedSet, HashSet}
 object H2IndexStorage {
   private val log: Logger = Logger.getLogger(classOf[H2IndexStorage])
 
-  def create(configRoot: String, nodeId : Int) : H2IndexStorage = {
+  def create(configRoot: String) : H2IndexStorage = {
     val storage = new H2IndexStorage
-    storage.init(configRoot, nodeId)
+    storage.init(configRoot)
     storage
   }
 }
@@ -39,9 +39,8 @@ class H2IndexStorage extends IndexStorage {
     conn
   }
 
-  def init(configRoot: String, nodeId : Int) {
+  def init(configRoot: String) {
     _configRoot = configRoot
-    _nodeId = nodeId
 
     Class.forName("org.h2.Driver")
     _cp = JdbcConnectionPool.create(createConnectionString, "sa", "sa")

@@ -8,17 +8,18 @@ import java.security.MessageDigest
 import io.stored.common.FileUtil
 import org.json.{JSONArray, JSONObject}
 import io.stored.server.ext.storage.H2IndexStorage
-import collection.mutable._
+import collection.immutable._
 import java.io.StringReader
 import net.sf.jsqlparser.parser.CCJSqlParserManager
 import io.stored.common.sql.TablesNamesFinder
 import net.sf.jsqlparser.statement.select.{PlainSelect, Union, SelectVisitor, Select}
 import java.util.Arrays
+import collection.mutable.{SynchronizedBuffer, ArrayBuffer, ListBuffer, SynchronizedMap}
 
 
-class Node(val localhost: String, val ids: collection.immutable.Set[Int], val schema: Schema) {
+class Node(val localhost: String, val ids: Set[Int], val schema: Schema) {
 
-  val storage = new HashMap[Int, IndexStorage] with SynchronizedMap[Int, IndexStorage]
+  val storage = new collection.mutable.HashMap[Int, IndexStorage] with SynchronizedMap[Int, IndexStorage]
 
 }
 
@@ -26,21 +27,21 @@ object Node {
 
   var node: Node = null
 
-  def getNodeId(hashCoords: collection.immutable.Map[String, Array[Byte]], schema: Schema) : Int = {
+  def getNodeId(hashCoords: Map[String, Array[Byte]], schema: Schema) : Int = {
     0
   }
 
-  def getTargetNodeId(data: collection.immutable.Map[String, AnyRef], schema: Schema) : Int = {
+  def getTargetNodeId(data: Map[String, AnyRef], schema: Schema) : Int = {
 //    val hashCoords = hashSchemaFields(data, schema)
     0
   }
 
   def getTargetNodeIds(sql: String) : Set[Int] = {
-    null
+    Set(0)
   }
 
   def getTargetHosts(nodeIds: Set[Int]) : Map[String, Set[Int]] = {
-    null
+    Map((node.localhost, nodeIds))
   }
 
   def hashSchemaFields(data: Map[String, AnyRef], schema: Schema) : Map[String, Array[Byte]] = {
@@ -66,7 +67,7 @@ object Node {
     node.localhost
   }
 
-  def determineNodeIds(dimensions: Int) : collection.immutable.Set[Int] = {
+  def determineNodeIds(dimensions: Int) : Set[Int] = {
     val ids = new collection.mutable.HashSet[Int]
     for (x <- 0 until math.pow(2, dimensions).toInt) ids.add(x)
     ids.toSet
@@ -107,11 +108,12 @@ object Node {
   def initialize(localhost: String, schemaFile: String, storagePath: String) {
     val schema = Schema.create(FileUtil.readJson(schemaFile))
     node = new Node(localhost, determineNodeIds(schema.dimensions), schema)
-    node.ids.par.foreach(id => node.storage.put(id, H2IndexStorage.create(storagePath, id)))
+    val storage = H2IndexStorage.create(storagePath)
+    node.ids.par.foreach(id => node.storage.put(id, storage))
   }
 
-  def queryHost(host: String, nodeIds: Set[Int], sql: String) : collection.immutable.Map[Int, List[Record]] = {
-    val resultMap = new HashMap[Int, List[Record]] with SynchronizedMap[Int, List[Record]]
+  def queryHost(host: String, nodeIds: Set[Int], sql: String) : Map[Int, List[Record]] = {
+    val resultMap = new collection.mutable.HashMap[Int, List[Record]] with SynchronizedMap[Int, List[Record]]
     if (host.equals(node.localhost)) {
       nodeIds.par.foreach(id => resultMap.put(id, node.storage.get(id).get.query(sql)))
     } else {
@@ -140,7 +142,7 @@ object Node {
     }
   }
 
-  def createNodeSql(sql: String) : String = {
+  def createNodeSql(sql: String) : (String, List[String]) = {
     val pm = new CCJSqlParserManager();
 
     val statement = pm.parse(new StringReader(sql));
@@ -149,14 +151,22 @@ object Node {
 
     val selectStatement = statement.asInstanceOf[Select];
 
+    var originalSelectItems = new ListBuffer[String]
+
     selectStatement.getSelectBody.accept(new SelectVisitor {
       def visit(plainSelect: PlainSelect) {
-        plainSelect.setSelectItems(Arrays.asList("*"))
+        val selectItems = plainSelect.getSelectItems
+        if (!(selectItems.size() == 1 && selectItems.get(0).equals("*"))) {
+          for (i <- 0 until selectItems.size()) {
+            originalSelectItems.append(selectItems.get(i).toString)
+          }
+          plainSelect.setSelectItems(Arrays.asList("*"))
+        }
       }
       def visit(union: Union) {}
     })
 
-    statement.toString
+    (statement.toString, originalSelectItems.toList)
   }
 
   def main(args: Array[String]) {
@@ -202,7 +212,7 @@ object Node {
             // TODO: rewrite sql for node queries, as it's almost certain what we want to sub query is not the same
             //val resultMap = new HashMap[String, Map[Int, List[Record]]] with SynchronizedMap[String, Map[Int, List[Record]]]
 //            hostsMap.keySet.par.foreach(host => resultMap.put(host, queryHost(host, hostsMap.get(host).get, sql)))
-            val nodeSql = createNodeSql(sql)
+            val (nodeSql, selectedItems) = createNodeSql(sql)
 
             // combine results and TODO: apply original sql
             val results = new ArrayBuffer[Record] with SynchronizedBuffer[Record]
