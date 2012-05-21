@@ -11,7 +11,6 @@ import io.stored.server.ext.storage.H2IndexStorage
 import collection.immutable._
 import java.io.StringReader
 import net.sf.jsqlparser.parser.CCJSqlParserManager
-import io.stored.common.sql.TablesNamesFinder
 import net.sf.jsqlparser.statement.select.{PlainSelect, Union, SelectVisitor, Select}
 import java.util.Arrays
 import collection.mutable.{SynchronizedBuffer, ArrayBuffer, ListBuffer, SynchronizedMap}

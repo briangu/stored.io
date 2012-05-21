@@ -1,29 +1,31 @@
 Summary
 =======
 
-Store-D is a schema-less JSON store that supports native SQL over dynamically added columns.
-It is also a distributed SQL storage system that uses hyperspace hashing and hypercube addressing schemes.
+Store-D (stored.io) is a schema-less JSON object store that supports native SQL.
+To make it scale, it is a distributed system that uses hyperspace hashing and hypercube addressing schemes.
 
-From a developer's perspective, it is a schema-less JSON store that supports native SQL.
+From a developer's perspective, the system is schemas because they never have to create them.  This is in the spirit of MongoDB.
+The system also supports native SQL on the added JSON Objects.
+When an object is added, the object is flattened automatically producing columns for each key-value path.
 
 From an operational perspective, it is a distribute system with a heavy bias towards read-oriented system of generally immutable data.
-For example, indexing of Twitter tweets, news information, stocks, etc.
+For example, indexing of Twitter tweets, news, rss, articles, stocks, etc.
 
 The general design is inspired by several well-known and lesser-known systems:
 
     HyperDex.org
     Cassandra
-    Mongo
+    MongoDB
     CM-2 (Connection Machine 2)
 
 Some of the principles align very well with OLAP
 
-Usage
-=====
+Example
+=======
 
 The basic developer experience consists simply of posting JSON objects into the system.
-The system "flattens" the JSON creating a key-paths for all contents and makes each unique key path a column in the db.
-Subsquently, the developer can use any key path in a SQL statement.
+The system "flattens" the JSON creating key-paths for all contents and makes each unique key path a column in the db.
+Subsequently, the developer can use any key-path in a SQL statement.
 
 Object paths are selectable via the standard SQL select an yield a portion of the original JSON object.
 
@@ -42,10 +44,24 @@ For example, given:
         "style": "bucket",
         "safety": {
           "rating": 5,
-          "belt_style": "5-point"
+          "beltstyle": "5-point"
         }
       }
     }
+
+The following columns are created:
+
+    color
+    year
+    model
+    manufacturer
+    mileage
+    field1
+    field2
+    seat_material
+    seat_style
+    seat_safety_rating
+    seat_safety_beltstyle
 
 Querying:
 
@@ -60,8 +76,12 @@ Produces:
     }
 
 
-Examples
+Usage
 ========
+
+Start the service by:
+
+  java -jar <stored.io.jar> stored.io/src/main/resources/schema.json stored.io/src/main/resources/db
 
 The following example shows how to add data and query it back out.  Notice, no table schemas were defined!
 
@@ -80,7 +100,7 @@ create a file called record.json
         "style": "bucket",
         "safety": {
           "rating": 5,
-          "belt_style": "5-point"
+          "beltstyle": "5-point"
         }
       }
     }

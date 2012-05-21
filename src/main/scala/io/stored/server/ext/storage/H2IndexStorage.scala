@@ -25,11 +25,10 @@ class H2IndexStorage extends IndexStorage {
   private val _tableName = "DATA_INDEX"
 
   private var _configRoot: String = null
-  private var _nodeId: Int = 0
   private var _cp: JdbcConnectionPool = null
   private var _tableColumns = new HashSet[String] with SynchronizedSet[String]
 
-  private def getDbFile: String = _configRoot + File.separator + "index_" + _nodeId
+  private def getDbFile: String = _configRoot + File.separator + "index"
   private def createConnectionString: String = "jdbc:h2:%s".format(getDbFile)
   private def getDbConnection: Connection = _cp.getConnection
 
