@@ -14,6 +14,8 @@ import net.sf.jsqlparser.parser.CCJSqlParserManager
 import net.sf.jsqlparser.statement.select.{PlainSelect, Union, SelectVisitor, Select}
 import java.util.Arrays
 import collection.mutable.{SynchronizedBuffer, ArrayBuffer, ListBuffer, SynchronizedMap}
+import net.sf.jsqlparser.expression.ExpressionVisitor
+import sql.SqlRequestProcessor
 
 
 class Node(val localhost: String, val ids: Set[Int], val schema: Schema) {
@@ -121,7 +123,7 @@ object Node {
     resultMap.toMap
   }
 
-  def createNodeSql(sql: String) : (String, List[String]) = {
+  def processSqlRequest(sql: String) : (String, List[String], Map[String, List[AnyRef]]) = {
     val pm = new CCJSqlParserManager();
 
     val statement = pm.parse(new StringReader(sql));
@@ -130,22 +132,10 @@ object Node {
 
     val selectStatement = statement.asInstanceOf[Select];
 
-    var originalSelectItems = new ListBuffer[String]
+    val sqlRequestProcessor = new SqlRequestProcessor
+    selectStatement.getSelectBody.accept(sqlRequestProcessor)
 
-    selectStatement.getSelectBody.accept(new SelectVisitor {
-      def visit(plainSelect: PlainSelect) {
-        val selectItems = plainSelect.getSelectItems
-        if (!(selectItems.size() == 1 && selectItems.get(0).equals("*"))) {
-          for (i <- 0 until selectItems.size()) {
-            originalSelectItems.append(selectItems.get(i).toString)
-          }
-          plainSelect.setSelectItems(Arrays.asList("*"))
-        }
-      }
-      def visit(union: Union) {}
-    })
-
-    (statement.toString, originalSelectItems.toList)
+    (statement.toString, sqlRequestProcessor.selectItems, sqlRequestProcessor.whereItems.toMap)
   }
 
   def copyJsonObjectPath(src: JSONObject, dst: JSONObject, path: List[String]) {
@@ -184,7 +174,7 @@ object Node {
     val schemaFile = args(0)
     val storagePath = args(1)
 
-    createNodeSql("select manufacturer from data_index where color='red'")
+    processSqlRequest("select manufacturer from data_index where color='red' and year in (1997,1998)")
 
     initialize("http://localhost:8080", schemaFile, storagePath)
 
@@ -216,13 +206,10 @@ object Node {
             if (!args.containsKey("sql")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
             val sql = args.get("sql")
 
+            val (nodeSql, selectedItems, whereItems) = processSqlRequest(sql)
+
             val nodeIds = getTargetNodeIds(sql)
             val hostsMap = getTargetHosts(nodeIds)
-
-            // TODO: rewrite sql for node queries, as it's almost certain what we want to sub query is not the same
-            //val resultMap = new HashMap[String, Map[Int, List[Record]]] with SynchronizedMap[String, Map[Int, List[Record]]]
-//            hostsMap.keySet.par.foreach(host => resultMap.put(host, queryHost(host, hostsMap.get(host).get, sql)))
-            val (nodeSql, selectedItems) = createNodeSql(sql)
 
             // combine results and TODO: apply original sql
             val results = new ArrayBuffer[Record] with SynchronizedBuffer[Record]
@@ -262,5 +249,3 @@ object Node {
     }})
   }
 }
-
-
