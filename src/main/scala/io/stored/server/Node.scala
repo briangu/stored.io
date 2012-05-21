@@ -122,26 +122,6 @@ object Node {
     resultMap.toMap
   }
 
-  def testjsql {
-    val pm = new CCJSqlParserManager();
-    var sql = "SELECT * FROM MY_TABLE1, MY_TABLE2, (SELECT * FROM MY_TABLE3) LEFT OUTER JOIN MY_TABLE4 WHERE ID = (SELECT MAX(ID) FROM MY_TABLE5) AND ID2 IN (SELECT * FROM MY_TABLE6)" ;
-
-    sql = "select manufacturer from data_index where color = 'red' and year = 1997"
-
-    val statement = pm.parse(new StringReader(sql));
-
-    if (statement.isInstanceOf[Select]) {
-      val selectStatement = statement.asInstanceOf[Select];
-
-      val tablesNamesFinder = new TablesNamesFinder();
-      val tableList = tablesNamesFinder.getTableList(selectStatement);
-      val iter = tableList.iterator()
-      while (iter.hasNext) {
-        println(iter.next());
-      }
-    }
-  }
-
   def createNodeSql(sql: String) : (String, List[String]) = {
     val pm = new CCJSqlParserManager();
 
@@ -167,6 +147,37 @@ object Node {
     })
 
     (statement.toString, originalSelectItems.toList)
+  }
+
+  def copyJsonObjectPath(src: JSONObject, dst: JSONObject, path: List[String]) {
+    if (path == null || path.size == 0) return
+
+    val key = path(0)
+    if (path.size == 1) {
+      dst.put(key, src.get(key))
+    } else {
+      val dstChild = new JSONObject()
+      dst.put(key, dstChild)
+      copyJsonObjectPath(src.getJSONObject(key), dstChild, path.slice(1, path.size))
+    }
+  }
+
+  def applySelectItems(selectedItems: List[String], records: List[Record]) : List[Record] = {
+    if (selectedItems == null || selectedItems.size == 0 || selectedItems(0).equals("*")) {
+      return records
+    }
+
+    val newRecords = new ListBuffer[Record]
+
+    records.foreach( record => {
+      val dst = new JSONObject()
+      selectedItems.foreach( rawPath => {
+        copyJsonObjectPath(record.rawData, dst, rawPath.split("_").toList)
+        newRecords.append(new Record(record.id, null, dst))
+      })
+    })
+
+    newRecords.toList
   }
 
   def main(args: Array[String]) {
@@ -221,9 +232,11 @@ object Node {
               hostResults.keys.par.foreach(id => results.appendAll(hostResults.get(id).get))
             })
 
+            val filteredResults = applySelectItems(selectedItems, results.toList)
+
             val jsonResponse = new JSONObject()
             val elements = new JSONArray()
-            results.foreach{ record => { elements.put( record.rawData) }}
+            filteredResults.foreach{ record => { elements.put( record.rawData) }}
             jsonResponse.put("elements", elements)
             new JsonResponse(jsonResponse)
           }

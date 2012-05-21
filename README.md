@@ -25,6 +25,40 @@ The basic developer experience consists simply of posting JSON objects into the 
 The system "flattens" the JSON creating a key-paths for all contents and makes each unique key path a column in the db.
 Subsquently, the developer can use any key path in a SQL statement.
 
+Object paths are selectable via the standard SQL select an yield a portion of the original JSON object.
+
+For example, given:
+
+    {
+      "color": "red",
+      "year": "1995",
+      "model": "mustang",
+      "manufacturer": "ford",
+      "mileage": 75000,
+      "field1": val1,
+      "field2": val1,
+      "seat": {
+        "material": "leather",
+        "style": "bucket",
+        "safety": {
+          "rating": 5,
+          "belt_style": "5-point"
+        }
+      }
+    }
+
+Querying:
+
+    select seat_material from data_index where seat_safety_rating = 5
+
+Produces:
+
+    {
+      "seat": {
+        "material": "leather"
+      }
+    }
+
 
 Examples
 ========
@@ -62,6 +96,23 @@ Query data from the store using plain-old-sql:
 or
 
     curl --data-urlencode "sql=select * from data_index where seat_safety_rating = 5" http://localhost:8080/records/queries
+
+or SELECT a portion of the object:
+
+    curl --data-urlencode "sql=select seat_material from data_index where seat_safety_rating = 5" http://localhost:8080/records/queries
+
+yielding:
+
+    {
+      "elements": [
+        {
+          "seat": {
+              "material": "leather"
+          }
+        }
+      ]
+    }
+
 
 Everytime you add new data to the system, columns will automatically be created for you.
 
