@@ -1,4 +1,4 @@
-package io.stored.server.storage
+package io.stored.server.ext.storage
 
 import org.apache.log4j.Logger
 import org.h2.jdbcx.JdbcConnectionPool

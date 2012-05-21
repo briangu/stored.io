@@ -1,18 +1,22 @@
 package io.stored.server
 
 import _root_.io.viper.core.server.router._
-import common.{Record, IndexStorage, Schema}
+import common.{Schema, IndexStorage, Record}
 import io.viper.common.{NestServer, RestServer}
 import org.jboss.netty.handler.codec.http.HttpResponseStatus
 import java.security.MessageDigest
 import io.stored.common.FileUtil
 import org.json.{JSONArray, JSONObject}
-import collection.immutable.HashMap
-import io.stored.server.storage.H2IndexStorage
-import collection.mutable.{SynchronizedBuffer, ListBuffer, SynchronizedMap, HashSet}
+import io.stored.server.ext.storage.H2IndexStorage
+import collection.mutable._
+import java.io.StringReader
+import net.sf.jsqlparser.parser.CCJSqlParserManager
+import io.stored.common.sql.TablesNamesFinder
+import net.sf.jsqlparser.statement.select.{PlainSelect, Union, SelectVisitor, Select}
+import java.util.Arrays
 
 
-class Node(val localhost: String, val ids: Set[Int], val schema: Schema) {
+class Node(val localhost: String, val ids: collection.immutable.Set[Int], val schema: Schema) {
 
   val storage = new HashMap[Int, IndexStorage] with SynchronizedMap[Int, IndexStorage]
 
@@ -22,11 +26,11 @@ object Node {
 
   var node: Node = null
 
-  def getNodeId(hashCoords: Map[String, Array[Byte]], schema: Schema) : Int = {
+  def getNodeId(hashCoords: collection.immutable.Map[String, Array[Byte]], schema: Schema) : Int = {
     0
   }
 
-  def getTargetNodeId(data: Map[String, AnyRef], schema: Schema) : Int = {
+  def getTargetNodeId(data: collection.immutable.Map[String, AnyRef], schema: Schema) : Int = {
 //    val hashCoords = hashSchemaFields(data, schema)
     0
   }
@@ -62,8 +66,8 @@ object Node {
     node.localhost
   }
 
-  def determineNodeIds(dimensions: Int) : Set[Int] = {
-    val ids = new HashSet[Int]
+  def determineNodeIds(dimensions: Int) : collection.immutable.Set[Int] = {
+    val ids = new collection.mutable.HashSet[Int]
     for (x <- 0 until math.pow(2, dimensions).toInt) ids.add(x)
     ids.toSet
   }
@@ -106,19 +110,61 @@ object Node {
     node.ids.par.foreach(id => node.storage.put(id, H2IndexStorage.create(storagePath, id)))
   }
 
-  def queryHost(host: String, nodeIds: Set[Int], sql: String) : Map[Int, List[Record]] = {
+  def queryHost(host: String, nodeIds: Set[Int], sql: String) : collection.immutable.Map[Int, List[Record]] = {
     val resultMap = new HashMap[Int, List[Record]] with SynchronizedMap[Int, List[Record]]
-    host match {
-      case node.localhost => nodeIds.par.foreach(id => resultMap.put(id, node.storage.get(id).get.query(sql)))
-      case _ => throw new RuntimeException("not yet supported")
+    if (host.equals(node.localhost)) {
+      nodeIds.par.foreach(id => resultMap.put(id, node.storage.get(id).get.query(sql)))
+    } else {
+      throw new RuntimeException("not yet supported")
     }
     resultMap.toMap
+  }
+
+  def testjsql {
+    val pm = new CCJSqlParserManager();
+    var sql = "SELECT * FROM MY_TABLE1, MY_TABLE2, (SELECT * FROM MY_TABLE3) LEFT OUTER JOIN MY_TABLE4 WHERE ID = (SELECT MAX(ID) FROM MY_TABLE5) AND ID2 IN (SELECT * FROM MY_TABLE6)" ;
+
+    sql = "select manufacturer from data_index where color = 'red' and year = 1997"
+
+    val statement = pm.parse(new StringReader(sql));
+
+    if (statement.isInstanceOf[Select]) {
+      val selectStatement = statement.asInstanceOf[Select];
+
+      val tablesNamesFinder = new TablesNamesFinder();
+      val tableList = tablesNamesFinder.getTableList(selectStatement);
+      val iter = tableList.iterator()
+      while (iter.hasNext) {
+        println(iter.next());
+      }
+    }
+  }
+
+  def createNodeSql(sql: String) : String = {
+    val pm = new CCJSqlParserManager();
+
+    val statement = pm.parse(new StringReader(sql));
+
+    if (!statement.isInstanceOf[Select]) throw new IllegalArgumentException("sql is not a select statement")
+
+    val selectStatement = statement.asInstanceOf[Select];
+
+    selectStatement.getSelectBody.accept(new SelectVisitor {
+      def visit(plainSelect: PlainSelect) {
+        plainSelect.setSelectItems(Arrays.asList("*"))
+      }
+      def visit(union: Union) {}
+    })
+
+    statement.toString
   }
 
   def main(args: Array[String]) {
 
     val schemaFile = args(0)
     val storagePath = args(1)
+
+    createNodeSql("select manufacturer from data_index where color='red'")
 
     initialize("http://localhost:8080", schemaFile, storagePath)
 
@@ -156,11 +202,12 @@ object Node {
             // TODO: rewrite sql for node queries, as it's almost certain what we want to sub query is not the same
             //val resultMap = new HashMap[String, Map[Int, List[Record]]] with SynchronizedMap[String, Map[Int, List[Record]]]
 //            hostsMap.keySet.par.foreach(host => resultMap.put(host, queryHost(host, hostsMap.get(host).get, sql)))
+            val nodeSql = createNodeSql(sql)
 
             // combine results and TODO: apply original sql
-            val results = new ListBuffer[Record] with SynchronizedBuffer[Record]
+            val results = new ArrayBuffer[Record] with SynchronizedBuffer[Record]
             hostsMap.keySet.par.foreach(host => {
-              val hostResults = queryHost(host, hostsMap.get(host).get, sql)
+              val hostResults = queryHost(host, hostsMap.get(host).get, nodeSql)
               hostResults.keys.par.foreach(id => results.appendAll(hostResults.get(id).get))
             })
 
@@ -190,8 +237,8 @@ object Node {
             new JsonResponse(jsonResponse)
           }
         })
-    }
-  })
+    }})
+  }
 }
 
 
