@@ -1,7 +1,7 @@
 Summary
 =======
 
-Store-D (stored.io) is a schema-less JSON object store that supports native SQL.
+Stored.io (store-d) is a schema-less JSON object store that supports native SQL.
 To make it scale, it is a distributed system that uses hyperspace hashing and hypercube addressing schemes.
 
 From a developer's perspective, the system is schemas because they never have to create them.  This is in the spirit of MongoDB.
@@ -63,7 +63,7 @@ The following columns are created:
     seat_safety_rating
     seat_safety_beltstyle
 
-Querying:
+Standard SQL is supported such that:
 
     select seat_material from data_index where seat_safety_rating = 5
 
@@ -81,7 +81,7 @@ Usage
 
 Start the service by:
 
-  java -jar <stored.io.jar> stored.io/src/main/resources/schema.json stored.io/src/main/resources/db
+  java -jar target/io.stored-0.0.1-SNAPSHOT-jar-with-dependencies.jar src/main/resources/config.json src/main/resources/db
 
 The following example shows how to add data and query it back out.  Notice, no table schemas were defined!
 
@@ -135,6 +135,7 @@ yielding:
 
 
 Everytime you add new data to the system, columns will automatically be created for you.
+However, only the columns specified in the hyperspace schema in config.json will be used to improve performance.
 
 Internals
 =========
