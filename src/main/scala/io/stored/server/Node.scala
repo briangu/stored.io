@@ -11,14 +11,12 @@ import io.stored.server.ext.storage.H2IndexStorage
 import collection.immutable._
 import java.io.StringReader
 import net.sf.jsqlparser.parser.CCJSqlParserManager
-import net.sf.jsqlparser.statement.select.{PlainSelect, Union, SelectVisitor, Select}
-import java.util.Arrays
+import net.sf.jsqlparser.statement.select.Select
 import collection.mutable.{SynchronizedBuffer, ArrayBuffer, ListBuffer, SynchronizedMap}
-import net.sf.jsqlparser.expression.ExpressionVisitor
 import sql.SqlRequestProcessor
 
 
-class Node(val localhost: String, val ids: Set[Int], val schema: Schema) {
+class Node(val localhost: String, val allNodeIds: Set[Int], val ids: Set[Int], val schema: Schema) {
 
   val storage = new collection.mutable.HashMap[Int, IndexStorage] with SynchronizedMap[Int, IndexStorage]
 
@@ -33,11 +31,23 @@ object Node {
   }
 
   def getTargetNodeId(data: Map[String, AnyRef], schema: Schema) : Int = {
-//    val hashCoords = hashSchemaFields(data, schema)
+//    val hashCoords = hashSchemaFields(data, projection)
     0
   }
 
-  def getTargetNodeIds(sql: String) : Set[Int] = {
+  def getTargetNodeIds(projection: Schema, whereItems: Map[String, List[AnyRef]]) : Set[Int] = {
+    if (whereItems == null || whereItems.size == 0) return node.allNodeIds
+
+    // extract which columns in the whereItems are in the projection
+    // for each column, compute the set of hashes
+    // determine which nodes are bound to the resulting hash coords
+    val intersection = whereItems.keySet.intersect(projection.fields.keySet)
+    if (intersection.size == 0) return node.allNodeIds
+
+    intersection.foreach{ col =>
+      whereItems.get(col)
+    }
+
     Set(0)
   }
 
@@ -69,6 +79,12 @@ object Node {
   }
 
   def determineNodeIds(dimensions: Int) : Set[Int] = {
+    val ids = new collection.mutable.HashSet[Int]
+    for (x <- 0 until math.pow(2, dimensions).toInt) ids.add(x)
+    ids.toSet
+  }
+
+  def determineAllNodeIds(dimensions: Int) : Set[Int] = {
     val ids = new collection.mutable.HashSet[Int]
     for (x <- 0 until math.pow(2, dimensions).toInt) ids.add(x)
     ids.toSet
@@ -108,7 +124,7 @@ object Node {
 
   def initialize(localhost: String, schemaFile: String, storagePath: String) {
     val schema = Schema.create(FileUtil.readJson(schemaFile))
-    node = new Node(localhost, determineNodeIds(schema.dimensions), schema)
+    node = new Node(localhost, determineAllNodeIds(schema.dimensions), determineNodeIds(schema.dimensions), schema)
     val storage = H2IndexStorage.create(storagePath)
     node.ids.par.foreach(id => node.storage.put(id, storage))
   }
@@ -181,9 +197,9 @@ object Node {
     NestServer.run(8080, new RestServer {
       def addRoutes {
         // transform map into flat namespace map
-        // perform hyperspace hashing on named fields using schema reference
+        // perform hyperspace hashing on named fields using projection reference
         // store Record into table
-        //  ensure all flattened field names exist using db schema reference
+        //  ensure all flattened field names exist using db projection reference
         //
         // determine which shard node to use from hash coords
         //  in the localhost case, we hold all shards on one Node
@@ -208,7 +224,7 @@ object Node {
 
             val (nodeSql, selectedItems, whereItems) = processSqlRequest(sql)
 
-            val nodeIds = getTargetNodeIds(sql)
+            val nodeIds = getTargetNodeIds(node.schema, whereItems)
             val hostsMap = getTargetHosts(nodeIds)
 
             // combine results and TODO: apply original sql
