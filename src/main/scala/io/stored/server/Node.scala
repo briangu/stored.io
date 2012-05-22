@@ -11,7 +11,7 @@ import collection.immutable._
 import java.io.StringReader
 import net.sf.jsqlparser.parser.CCJSqlParserManager
 import net.sf.jsqlparser.statement.select.Select
-import collection.mutable.{SynchronizedBuffer, ArrayBuffer, ListBuffer, SynchronizedMap}
+import collection.mutable.{ListBuffer, SynchronizedMap}
 import sql.SqlRequestProcessor
 
 
@@ -73,7 +73,7 @@ object Node {
   }
 
   def getNodeHosts(nodeIds: Set[Int]) : Map[String, Set[Int]] = {
-    Map((node.localhost, nodeIds))
+    Map((node.localhost, Set(0))) // TODO: TOTAL HACK TO SHORT-CURCUIT SCATTER GATHER ON LOCALHOST
   }
 
   // TODO: support multiple values for data map
