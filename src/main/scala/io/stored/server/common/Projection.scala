@@ -7,7 +7,7 @@ import collection.mutable.LinkedHashMap
 class Projection(val dimensions: Int, fields: collection.mutable.LinkedHashMap[String, ProjectionField]) {
 
   def getFields = fields.keySet
-  def getFieldValue(key: String) = fields.get(key)
+  def getFieldValue(key: String) = fields.get(key).get
 
 }
 

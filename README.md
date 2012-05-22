@@ -87,7 +87,7 @@ The following example shows how to add data and query it back out.  Notice, no t
 
 create a file called record.json
 
-    {
+    record={
       "color": "red",
       "year": "1995",
       "model": "mustang",

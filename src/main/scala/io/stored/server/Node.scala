@@ -31,19 +31,45 @@ object Node {
     val intersection = hashCoords.keySet.intersect(projection.getFields)
     if (intersection.size == 0) return node.allNodeIds
 
-    val nodeIds = new collection.mutable.HashSet[Int]
-
-    var nodeId = BigInt.apply(0)
+    // fill each project field with all appropriate values
+    val fieldMap = new collection.mutable.HashMap[String, List[BigInt]]
     projection.getFields.foreach{ key =>
-      if (!hashCoords.contains(key)) throw new RuntimeException("missing expected projection field: " + key)
-      val sf = projection.getFieldValue(key).get
-      nodeId = nodeId << sf.bitWeight
-      nodeId = nodeId | (hashCoords.get(key).get(0) & (math.pow(2, sf.bitWeight).toInt-1))
+      if (hashCoords.contains(key)) {
+        fieldMap.put(key, hashCoords.get(key).get)
+      } else {
+        fieldMap.put(key, genFieldValues(projection.getFieldValue(key).bitWeight))
+      }
     }
 
-    nodeIds.add((nodeId & (math.pow(2, projection.dimensions).toInt-1)).toInt)
+    val fieldList = projection.getFields.toList
 
+    // generate all possible nodeIds using the fieldMap
+    val nodeIds = new collection.mutable.HashSet[Int]
+    genNodeIds(fieldList, projection, fieldMap.toMap, nodeIds, 0)
     nodeIds.toSet
+  }
+
+  def genFieldValues(bitwidth: Int) : List[BigInt] = {
+    val ids = new collection.mutable.HashSet[BigInt]
+    for (x <- 0 until math.pow(2, bitwidth).toInt) ids.add(BigInt.apply(x))
+    ids.toList
+  }
+
+  def genNodeIds(fields: List[String], proj: Projection, fieldMap: Map[String, List[BigInt]], nodeIds: collection.mutable.HashSet[Int], nodeIdPrefix: Int) {
+
+    if (fields.size == 0) {
+      nodeIds.add(nodeIdPrefix)
+      return
+    }
+
+    val bitWidth = proj.getFieldValue(fields(0)).bitWeight
+    val shifted = BigInt.apply(nodeIdPrefix << bitWidth)
+    val mask = (math.pow(2, bitWidth).toInt - 1)
+
+    fieldMap.get(fields(0)).get.foreach{ bitVal =>
+      val nodeId = shifted | (bitVal & mask)
+      genNodeIds(fields.slice(1, fields.size), proj, fieldMap, nodeIds, nodeId.toInt)
+    }
   }
 
   def getNodeHosts(nodeIds: Set[Int]) : Map[String, Set[Int]] = {
@@ -55,14 +81,16 @@ object Node {
     val result = new collection.mutable.HashMap[String, List[BigInt]] with SynchronizedMap[String, List[BigInt]]
     projection.getFields.par.foreach{ key =>
       if (data.contains(key)) {
-        val dataVal = data.get(key)
+        val dataVal = data.get(key).get
 
         if (dataVal.isInstanceOf[Long]) {
           result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[Long])))
+        } else if (dataVal.isInstanceOf[java.lang.Integer]) {
+          result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[java.lang.Integer])))
         } else if (dataVal.isInstanceOf[String]) {
-          result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[Long])))
+          result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[String])))
         } else if (dataVal.isInstanceOf[Double]) {
-          result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[Long])))
+          result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[Double])))
         } else {
           throw new RuntimeException("unknown field type: " + dataVal.getClass)
         }
@@ -172,6 +200,8 @@ object Node {
     val schemaFile = args(0)
     val storagePath = args(1)
 
+    processSqlRequest("select * from data_index")
+    processSqlRequest("select * from data_index where color='red' and year in (1997,1998)")
     processSqlRequest("select manufacturer from data_index where color='red' and year in (1997,1998)")
 
     initialize("http://localhost:8080", schemaFile, storagePath)
@@ -179,9 +209,9 @@ object Node {
     NestServer.run(8080, new RestServer {
       def addRoutes {
         // transform map into flat namespace map
-        // perform hyperspace hashing on named fields using projection reference
+        // perform hyperspace hashing on named fields using proj reference
         // store Record into table
-        //  ensure all flattened field names exist using db projection reference
+        //  ensure all flattened field names exist using db proj reference
         //
         // determine which shard node to use from hash coords
         //  in the localhost case, we hold all shards on one Node
@@ -191,8 +221,12 @@ object Node {
           def exec(args: java.util.Map[String, String]): RouteResponse = {
             if (!args.containsKey("record")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
             val record = Record.create(args.get("record"))
-            if (!record.colMap.keySet.equals(node.projection.getFields)) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+
+            val intersection = record.colMap.keySet.intersect(node.projection.getFields)
+            if (intersection.size != node.projection.getFields.size) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+
             val hashCoords = hashProjectionFields(node.projection, record.colMap)
+
             val nodeIds = getNodeIds(node.projection, hashCoords)
             indexRecord(nodeIds, record)
             val response = new JSONObject();
@@ -212,13 +246,17 @@ object Node {
             val hostsMap = getNodeHosts(nodeIds)
 
             // combine results and TODO: apply original sql
-            val results = new ArrayBuffer[Record] with SynchronizedBuffer[Record]
+            val results = new collection.mutable.HashMap[String, Record] with SynchronizedMap[String, Record]
             hostsMap.keySet.par.foreach(host => {
               val hostResults = queryHost(host, hostsMap.get(host).get, nodeSql)
-              hostResults.keys.par.foreach(id => results.appendAll(hostResults.get(id).get))
+              hostResults.keys.par.foreach{id =>
+                hostResults.get(id).get.foreach{ record =>
+                  results.put(record.id, record)
+                }
+              }
             })
 
-            val filteredResults = applySelectItems(selectedItems, results.toList)
+            val filteredResults = applySelectItems(selectedItems, results.values.toList)
 
             val jsonResponse = new JSONObject()
             val elements = new JSONArray()

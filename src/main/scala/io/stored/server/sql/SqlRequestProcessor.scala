@@ -186,7 +186,7 @@ class SqlRequestProcessor extends SelectVisitor with ExpressionVisitor
 
     selectItems = originalSelectItems.toList
 
-    plainSelect.getWhere.accept(this)
+    if (plainSelect.getWhere != null) plainSelect.getWhere.accept(this)
   }
 
   def visit(p1: Union)

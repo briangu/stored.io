@@ -11,6 +11,7 @@ object ProjectionField {
 
   def md5Hash(v: Double) : BigInt = md5Hash(BigInt.apply(v.toLong).toByteArray)
   def md5Hash(v: Long) : BigInt = md5Hash(BigInt.apply(v).toByteArray)
+  def md5Hash(v: java.lang.Integer) : BigInt = md5Hash(BigInt.apply(v).toByteArray)
   def md5Hash(str: String) : BigInt = md5Hash(str.getBytes("UTF-8"))
 
   def md5Hash(record: Array[Byte]) : BigInt = {
