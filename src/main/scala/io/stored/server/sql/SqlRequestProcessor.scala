@@ -14,7 +14,7 @@ import collection.mutable.{HashMap, ListBuffer}
 class SqlRequestProcessor extends SelectVisitor with ExpressionVisitor
 {
   var selectItems: List[String] = null
-  var whereItems: HashMap[String, List[AnyRef]] = new HashMap[String, List[AnyRef]]
+  var whereItems: HashMap[String, List[BigInt]] = new HashMap[String, List[BigInt]]
 
   def visit(p1: NullValue)
   {}

@@ -6,11 +6,12 @@ import net.sf.jsqlparser.expression.LongValue
 import net.sf.jsqlparser.expression.StringValue
 import collection.mutable.ListBuffer
 import net.sf.jsqlparser.expression.operators.relational.{ItemsListVisitor, ExpressionList}
+import io.stored.server.common.ProjectionField
 
 
 class ItemListValuesExtractor extends ItemsListVisitor
 {
-  private val columnValues = new ListBuffer[AnyRef]
+  private val columnValues = new ListBuffer[BigInt]
 
   def getValues = columnValues.toList
 
@@ -23,9 +24,9 @@ class ItemListValuesExtractor extends ItemsListVisitor
     p1.getExpressions.foreach{x =>
       val o = x.asInstanceOf[AnyRef]
       if (o.isInstanceOf[LongValue]) {
-        columnValues.append(o.asInstanceOf[LongValue].getValue.asInstanceOf[AnyRef])
+        columnValues.append(ProjectionField.md5Hash(o.asInstanceOf[LongValue].getValue))
       } else if (o.isInstanceOf[StringValue]) {
-        columnValues.append(o.asInstanceOf[StringValue].getValue.asInstanceOf[AnyRef])
+        columnValues.append(ProjectionField.md5Hash(o.asInstanceOf[StringValue].getValue))
       }
     }
   }

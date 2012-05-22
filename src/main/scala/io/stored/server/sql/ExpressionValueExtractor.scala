@@ -7,11 +7,12 @@ import net.sf.jsqlparser.schema.Column
 import operators.arithmetic._
 import operators.conditional.{AndExpression, OrExpression}
 import operators.relational._
+import io.stored.server.common.ProjectionField
 
 
 class ExpressionValueExtractor extends ExpressionVisitor
 {
-  var expressionValue : AnyRef = null
+  var expressionValue : BigInt = null
 
   def visit(p1: NullValue)
   {}
@@ -25,9 +26,9 @@ class ExpressionValueExtractor extends ExpressionVisitor
   def visit(p1: JdbcParameter)
   {}
 
-  def visit(p1: DoubleValue) = expressionValue = p1.getValue.asInstanceOf[AnyRef]
+  def visit(p1: DoubleValue) = expressionValue = ProjectionField.md5Hash(p1.getValue)
 
-  def visit(p1: LongValue) = expressionValue = p1.getValue.asInstanceOf[AnyRef]
+  def visit(p1: LongValue) = expressionValue = ProjectionField.md5Hash(p1.getValue)
 
   def visit(p1: DateValue)
   {}
@@ -41,7 +42,7 @@ class ExpressionValueExtractor extends ExpressionVisitor
   def visit(p1: Parenthesis)
   {}
 
-  def visit(p1: StringValue) = expressionValue = p1.getValue.asInstanceOf[AnyRef]
+  def visit(p1: StringValue) = expressionValue = ProjectionField.md5Hash(p1.getValue)
 
   def visit(p1: Addition)
   {}
