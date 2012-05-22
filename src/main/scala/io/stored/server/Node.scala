@@ -245,18 +245,15 @@ object Node {
             val nodeIds = getNodeIds(node.projection, whereItems)
             val hostsMap = getNodeHosts(nodeIds)
 
-            // combine results and TODO: apply original sql
-            val results = new collection.mutable.HashMap[String, Record] with SynchronizedMap[String, Record]
+            val mergeDb = H2IndexStorage.createInMemoryDb
             hostsMap.keySet.par.foreach(host => {
               val hostResults = queryHost(host, hostsMap.get(host).get, nodeSql)
               hostResults.keys.par.foreach{id =>
-                hostResults.get(id).get.foreach{ record =>
-                  results.put(record.id, record)
-                }
+                mergeDb.addAll(hostResults.get(id).get.toList)
               }
             })
-
-            val filteredResults = applySelectItems(selectedItems, results.values.toList)
+            val results = mergeDb.query(nodeSql)
+            val filteredResults = applySelectItems(selectedItems, results.toList)
 
             val jsonResponse = new JSONObject()
             val elements = new JSONArray()

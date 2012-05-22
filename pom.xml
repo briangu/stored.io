@@ -34,6 +34,11 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.ning</groupId>
+      <artifactId>async-http-client</artifactId>
+      <version>1.7.4</version>
+    </dependency>
+    <dependency>
       <groupId>net.sf.jsqlparser</groupId>
       <artifactId>net.sf.jsqlparser</artifactId>
       <version>0.7.0</version>

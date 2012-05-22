@@ -26,6 +26,12 @@ object Record {
     map.toMap
   }
 
+  def create(id: String, rawData: String) : Record = {
+    val jsonData = new JSONObject(rawData)
+    val colMap = flatten(jsonData)
+    new Record(id, colMap, jsonData)
+  }
+
   def create(rawData: String) : Record = {
     val id = CryptoUtil.computeHash(rawData.getBytes("UTF-8"))
     val jsonData = new JSONObject(rawData)
@@ -38,8 +44,11 @@ object Record {
     val keyMap = flatten(jsonData)
     new Record(hash, keyMap, jsonData)
   }
+
+  def create(id: String, jsonData: JSONObject) : Record = {
+    val keyMap = flatten(jsonData)
+    new Record(id, keyMap, jsonData)
+  }
 }
 
-class Record(val id: String, val colMap: Map[String, AnyRef], val rawData: JSONObject) {
-
-}
+class Record(val id: String, val colMap: Map[String, AnyRef], val rawData: JSONObject) {}

@@ -10,26 +10,32 @@ import io.stored.server.common.{Record, IndexStorage}
 import io.stored.common.SqlUtil
 import collection.mutable.{ListBuffer, SynchronizedSet, HashSet}
 
+
 object H2IndexStorage {
   private val log: Logger = Logger.getLogger(classOf[H2IndexStorage])
 
-  def create(configRoot: String) : H2IndexStorage = {
-    val storage = new H2IndexStorage
-    storage.init(configRoot)
+  def createInMemoryDb : IndexStorage = {
+    val storage = new H2IndexStorage(null)
+    storage.init()
+    storage
+  }
+
+  def create(configRoot: String) : IndexStorage = {
+    val storage = new H2IndexStorage(configRoot)
+    storage.init()
     storage
   }
 }
 
-class H2IndexStorage extends IndexStorage {
+class H2IndexStorage(configRoot: String) extends IndexStorage {
 
   private val _tableName = "DATA_INDEX"
 
-  private var _configRoot: String = null
   private var _cp: JdbcConnectionPool = null
-  private var _tableColumns = new HashSet[String] with SynchronizedSet[String]
+  private val _tableColumns = new HashSet[String] with SynchronizedSet[String]
 
-  private def getDbFile: String = _configRoot + File.separator + "index"
-  private def createConnectionString: String = "jdbc:h2:%s".format(getDbFile)
+  private def getDbFile: String = configRoot + File.separator + "index"
+  private def createConnectionString: String = "jdbc:h2:%s".format(if (isMemoryDb) "mem:" else getDbFile)
   private def getDbConnection: Connection = _cp.getConnection
 
   private def getReadOnlyDbConnection: Connection = {
@@ -38,13 +44,15 @@ class H2IndexStorage extends IndexStorage {
     conn
   }
 
-  def init(configRoot: String) {
-    _configRoot = configRoot
+  def isMemoryDb = configRoot == null
 
+  def init() {
     Class.forName("org.h2.Driver")
     _cp = JdbcConnectionPool.create(createConnectionString, "sa", "sa")
-    val file: File = new File(getDbFile + ".h2.db")
-    if (!file.exists) bootstrapDb
+
+    if (isMemoryDb || new File(getDbFile + ".h2.db").exists() != true) {
+      bootstrapDb
+    }
 
     loadColumnNames
   }
@@ -261,7 +269,13 @@ class H2IndexStorage extends IndexStorage {
     try {
       db = getDbConnection
       db.setAutoCommit(false)
-      data.foreach(add(db,_tableName,_))
+      data.foreach{ record =>
+        if (record.colMap == null) {
+          add(db,_tableName, Record.create(record.id, record.rawData))
+        } else {
+          add(db,_tableName, record)
+        }
+      }
       db.commit
     }
     catch {
@@ -320,9 +334,7 @@ class H2IndexStorage extends IndexStorage {
       db = getReadOnlyDbConnection
       statement = db.prepareStatement(sql)
       val rs: ResultSet = statement.executeQuery
-      while (rs.next) {
-        results.append(new Record(rs.getString("HASH"), null, new JSONObject(rs.getString("RAWDATA"))))
-      }
+      while (rs.next) results.append(new Record(rs.getString("HASH"), null, new JSONObject(rs.getString("RAWDATA"))))
     }
     catch {
       case e: JSONException => {
