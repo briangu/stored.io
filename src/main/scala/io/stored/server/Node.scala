@@ -240,13 +240,13 @@ object Node {
           def exec(args: java.util.Map[String, String]): RouteResponse = {
             if (!args.containsKey("sql")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
             val sql = args.get("sql")
-
             val (nodeSql, selectedItems, whereItems) = processSqlRequest(sql)
-
             val nodeIds = getNodeIds(node.projection, whereItems)
             val hostsMap = getNodeHosts(nodeIds)
 
             var results : List[Record] = null
+
+            // TODO: don't do this if we only have one target host
             val mergeDb = H2IndexStorage.createInMemoryDb
             try {
               hostsMap.keySet.par.foreach{host =>
