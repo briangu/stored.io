@@ -197,16 +197,17 @@ object Node {
 
   def main(args: Array[String]) {
 
-    val schemaFile = args(0)
-    val storagePath = args(1)
+    val localPort = args(0).toInt
+    val schemaFile = args(1)
+    val storagePath = args(2)
 
     processSqlRequest("select * from data_index")
     processSqlRequest("select * from data_index where color='red' and year in (1997,1998)")
     processSqlRequest("select manufacturer from data_index where color='red' and year in (1997,1998)")
 
-    initialize("http://localhost:8080", schemaFile, storagePath)
+    initialize("http://localhost:%d".format(localPort), schemaFile, storagePath)
 
-    NestServer.run(8080, new RestServer {
+    NestServer.run(localPort, new RestServer {
       def addRoutes {
         // transform map into flat namespace map
         // perform hyperspace hashing on named fields using proj reference
@@ -229,7 +230,7 @@ object Node {
 
             val nodeIds = getNodeIds(node.projection, hashCoords)
             indexRecord(nodeIds, record)
-            val response = new JSONObject();
+            val response = new JSONObject()
             response.put("id", record.id)
             new JsonResponse(response)
           }
@@ -245,19 +246,22 @@ object Node {
             val nodeIds = getNodeIds(node.projection, whereItems)
             val hostsMap = getNodeHosts(nodeIds)
 
+            var results : List[Record] = null
             val mergeDb = H2IndexStorage.createInMemoryDb
-            hostsMap.keySet.par.foreach(host => {
-              val hostResults = queryHost(host, hostsMap.get(host).get, nodeSql)
-              hostResults.keys.par.foreach{id =>
-                mergeDb.addAll(hostResults.get(id).get.toList)
+            try {
+              hostsMap.keySet.par.foreach{host =>
+                val hostResults = queryHost(host, hostsMap.get(host).get, nodeSql)
+                hostResults.keys.par.foreach(id => mergeDb.addAll(hostResults.get(id).get.toList))
+                results = mergeDb.query(nodeSql)
               }
-            })
-            val results = mergeDb.query(nodeSql)
-            val filteredResults = applySelectItems(selectedItems, results.toList)
+            } finally {
+              mergeDb.shutdown()
+            }
+            val filteredResults = applySelectItems(selectedItems, results)
 
-            val jsonResponse = new JSONObject()
             val elements = new JSONArray()
             filteredResults.foreach{ record => { elements.put( record.rawData) }}
+            val jsonResponse = new JSONObject()
             jsonResponse.put("elements", elements)
             new JsonResponse(jsonResponse)
           }
