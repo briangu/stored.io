@@ -224,23 +224,26 @@ object Node {
 
             val sql = args.get("sql").replace(".", "__") // TODO correct using jsqlparser visitor
             val (projectionName, nodeSql, selectedItems, whereItems) = processSqlRequest(sql)
-            if (!node.projections.hasProjection(projectionName)) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+            if (node.projections.hasProjection(projectionName)) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
             val projection = node.projections.getProjection(projectionName)
             val nodeIds = getNodeIds(projection, whereItems)
             val hostsMap = projection.getNodeHosts(nodeIds)
 
-            var results : List[Record] = null
-
-            // TODO: don't do this if we only have one target host
-            val mergeDb = H2IndexStorage.createInMemoryDb
-            try {
-              hostsMap.keySet.par.foreach{host =>
-                val hostResults = queryHost(host, hostsMap.get(host).get, nodeSql)
-                hostResults.keys.par.foreach(id => mergeDb.addAll(hostResults.get(id).get.toList))
-                results = mergeDb.query(nodeSql)
+            val results : List[Record] = if (nodeIds.size == 1) {
+              queryHost(projection.getNodeIndexStorage(nodeIds.toList(0)), nodeIds, nodeSql).values.toList(0)
+            } else {
+              var hostResults : List[Record] = null
+              val mergeDb = H2IndexStorage.createInMemoryDb
+              try {
+                hostsMap.keySet.par.foreach{host =>
+                  val hostResults = queryHost(host, hostsMap.get(host).get, nodeSql)
+                  hostResults.keys.par.foreach(id => mergeDb.addAll(hostResults.get(id).get.toList))
+                  hostResults = mergeDb.query(nodeSql)
+                }
+              } finally {
+                mergeDb.shutdown()
               }
-            } finally {
-              mergeDb.shutdown()
+              hostResults
             }
             val filteredResults = applySelectItems(selectedItems, results)
 
