@@ -14,7 +14,7 @@ import collection.mutable.{ListBuffer, SynchronizedMap}
 import sql.SqlRequestProcessor
 
 
-class Node(val localhost: String, val localNode : IndexStorage, val projections: ProjectionsConfig) {}
+class Node(val localNode : IndexStorage, val projections: ProjectionsConfig) {}
 
 object Node {
 
@@ -106,7 +106,7 @@ object Node {
   def initialize(localhost: String, storagePath: String, nodesConfigFile: String, projectionsConfigFile: String) {
     val localNode = H2IndexStorage.create(storagePath)
     val projections = ProjectionsConfig.create(localhost, localNode, nodesConfigFile, projectionsConfigFile)
-    node = new Node(localhost, localNode, projections)
+    node = new Node(localNode, projections)
   }
 
   def queryHost(host: IndexStorage, nodeIds: Set[Int], sql: String) : Map[Int, List[Record]] = {
@@ -232,18 +232,18 @@ object Node {
             val results : List[Record] = if (nodeIds.size == 1) {
               queryHost(projection.getNodeIndexStorage(nodeIds.toList(0)), nodeIds, nodeSql).values.toList(0)
             } else {
-              var hostResults : List[Record] = null
+              var mergedResults : List[Record] = null
               val mergeDb = H2IndexStorage.createInMemoryDb
               try {
                 hostsMap.keySet.par.foreach{host =>
                   val hostResults = queryHost(host, hostsMap.get(host).get, nodeSql)
                   hostResults.keys.par.foreach(id => mergeDb.addAll(hostResults.get(id).get.toList))
-                  hostResults = mergeDb.query(nodeSql)
+                  mergedResults = mergeDb.query(nodeSql)
                 }
               } finally {
                 mergeDb.shutdown()
               }
-              hostResults
+              mergedResults
             }
             val filteredResults = applySelectItems(selectedItems, results)
 
