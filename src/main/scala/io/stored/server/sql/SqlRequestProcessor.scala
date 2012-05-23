@@ -2,17 +2,18 @@ package io.stored.server.sql
 
 
 import net.sf.jsqlparser.expression._
-import net.sf.jsqlparser.statement.select.{SubSelect, PlainSelect, Union, SelectVisitor}
-import net.sf.jsqlparser.schema.Column
 import operators.arithmetic._
 import operators.conditional._
 import operators.relational._
 import java.util.Arrays
 import collection.mutable.{HashMap, ListBuffer}
+import net.sf.jsqlparser.statement.select._
+import net.sf.jsqlparser.schema.{Table, Column}
 
 
 class SqlRequestProcessor extends SelectVisitor with ExpressionVisitor
 {
+  var projectionName: String = null
   var selectItems: List[String] = null
   var whereItems: HashMap[String, List[BigInt]] = new HashMap[String, List[BigInt]]
 
@@ -172,7 +173,20 @@ class SqlRequestProcessor extends SelectVisitor with ExpressionVisitor
 
   def visit(plainSelect: PlainSelect)
   {
-    var originalSelectItems = new ListBuffer[String]
+    val originalSelectItems = new ListBuffer[String]
+
+    plainSelect.getFromItem.accept(new FromItemVisitor {
+      def visit(p1: Table)
+      {
+        projectionName = p1.getName
+      }
+
+      def visit(p1: SubSelect)
+      {}
+
+      def visit(p1: SubJoin)
+      {}
+    })
 
     val sqlSelectItems = plainSelect.getSelectItems
     if (!(sqlSelectItems.size() == 1 && sqlSelectItems.get(0).equals("*")))

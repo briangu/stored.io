@@ -121,14 +121,15 @@ object Node {
     resultMap.toMap
   }
 
-  def processSqlRequest(sql: String) : (String, List[String], Map[String, List[BigInt]]) = {
+  // TODO: make table name configurable - maybe the projection name? map to DATA_INDEX
+  def processSqlRequest(sql: String) : (String, String, List[String], Map[String, List[BigInt]]) = {
     val pm = new CCJSqlParserManager
     val statement = pm.parse(new StringReader(sql))
     if (!statement.isInstanceOf[Select]) throw new IllegalArgumentException("sql is not a select statement")
     val selectStatement = statement.asInstanceOf[Select]
-    val sqlRequestProcessor = new SqlRequestProcessor
-    selectStatement.getSelectBody.accept(sqlRequestProcessor)
-    (statement.toString, sqlRequestProcessor.selectItems, sqlRequestProcessor.whereItems.toMap)
+    val sp = new SqlRequestProcessor
+    selectStatement.getSelectBody.accept(sp)
+    (sp.projectionName, statement.toString, sp.selectItems, sp.whereItems.toMap)
   }
 
   def copyJsonObjectPath(src: JSONObject, dst: JSONObject, path: List[String]) {
@@ -225,10 +226,11 @@ object Node {
         post("/records/queries", new RouteHandler {
           def exec(args: java.util.Map[String, String]): RouteResponse = {
             if (!args.containsKey("sql")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
-            val projection = getRequestedProjection(args)
 
             val sql = args.get("sql").replace(".", "__") // TODO correct using jsqlparser visitor
-            val (nodeSql, selectedItems, whereItems) = processSqlRequest(sql)
+            val (projectionName, nodeSql, selectedItems, whereItems) = processSqlRequest(sql)
+            if (!node.projections.hasProjection(projectionName)) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+            val projection = node.projections.getProjection(projectionName)
             val nodeIds = getNodeIds(projection, whereItems)
             val hostsMap = projection.getNodeHosts(nodeIds)
 
@@ -249,24 +251,6 @@ object Node {
 
             val elements = new JSONArray()
             filteredResults.foreach{ record => { elements.put( record.rawData) }}
-            jsonResponse("elements", elements)
-          }
-        })
-
-        post("/records/queries/nodes/$node", new RouteHandler {
-          def exec(args: java.util.Map[String, String]): RouteResponse = {
-            if (!args.containsKey("sql")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
-            if (!args.containsKey("node")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
-            val sql = args.get("sql")
-            val nodeId = args.get("node").toInt
-            val projection = getRequestedProjection(args)
-
-            if (!projection.localNodeIds.contains(nodeId)) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
-
-            val results = node.localNode.query(sql)
-
-            val elements = new JSONArray()
-            results.foreach{ record => { elements.put( record.rawData) }}
             jsonResponse("elements", elements)
           }
         })
