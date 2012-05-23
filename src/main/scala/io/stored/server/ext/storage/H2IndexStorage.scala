@@ -142,18 +142,18 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
 
           if (colVal.isInstanceOf[String]) {
             colType = "VARCHAR"
-          }
-          else if (colVal.isInstanceOf[Long]) {
+          } else if (colVal.isInstanceOf[Long]) {
             colType = "LONG"
-          }
-          else if (colVal.isInstanceOf[Int]) {
+          } else if (colVal.isInstanceOf[Int]) {
             colType = "INTEGER"
-          }
-          else {
+          } else if (colVal.isInstanceOf[Boolean]) {
+            colType = "BOOLEAN"
+          } else {
+            println(colName + " " + colVal.getClass.toString)
             throw new IllegalArgumentException("unknown obj type: " + colVal.getClass.toString)
           }
 
-          var sql = "ALTER TABLE %s ADD %s %s".format(tableName, colName, colType)
+          val sql = "ALTER TABLE %s ADD %s %s".format(tableName, colName, colType)
 
           statement = db.prepareStatement(sql)
           statement.execute
@@ -231,12 +231,12 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
   private def bind(statement: PreparedStatement, idx: Int, obj: AnyRef) {
     if (obj.isInstanceOf[String]) {
       statement.setString(idx, obj.asInstanceOf[String])
-    }
-    else if (obj.isInstanceOf[Long]) {
+    } else if (obj.isInstanceOf[Long]) {
       statement.setLong(idx, obj.asInstanceOf[Long])
-    }
-    else if (obj.isInstanceOf[Int]) {
+    } else if (obj.isInstanceOf[Int]) {
       statement.setInt(idx, obj.asInstanceOf[Int])
+    } else if (obj.isInstanceOf[Boolean]) {
+      statement.setBoolean(idx, obj.asInstanceOf[Boolean])
     }
     else {
       throw new IllegalArgumentException("unknown obj type: " + obj.toString)

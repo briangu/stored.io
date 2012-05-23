@@ -3,6 +3,8 @@ package io.stored.server.common
 import collection.mutable.HashMap
 import org.json.JSONObject
 import io.stored.common.CryptoUtil
+import util.parsing.json.JSONArray
+
 
 object Record {
   def flatten(jsonData: JSONObject) : Map[String, AnyRef] = {
@@ -17,9 +19,20 @@ object Record {
       val refPath = "%s%s".format(path, key)
       val ref = jsonData.get(key)
       if (ref.isInstanceOf[JSONObject]) {
-        flatten(ref.asInstanceOf[JSONObject], refPath + "_", map)
+        flatten(ref.asInstanceOf[JSONObject], refPath + "__", map)
+      } else if (ref.isInstanceOf[JSONArray]) {
+        // TODO: make this work
+        println("skipping jsonarray for key: " + refPath)
       } else {
-        map.put(refPath, ref)
+        if (ref.isInstanceOf[String]
+            || ref.isInstanceOf[Long]
+            || ref.isInstanceOf[Int]
+            || ref.isInstanceOf[Double]
+            || ref.isInstanceOf[Boolean]) {
+          map.put(refPath, ref)
+        } else {
+          println("skipping key: " + refPath)
+        }
       }
     }
 

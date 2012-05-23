@@ -79,7 +79,7 @@ object Node {
   // TODO: support multiple values for data map
   def hashProjectionFields(projection: Projection, data: Map[String, AnyRef]) : Map[String, List[BigInt]] = {
     val result = new collection.mutable.HashMap[String, List[BigInt]] with SynchronizedMap[String, List[BigInt]]
-    projection.getFields.par.foreach{ key =>
+    data.keySet.par.foreach{ key =>
       if (data.contains(key)) {
         val dataVal = data.get(key).get
 
@@ -92,7 +92,7 @@ object Node {
         } else if (dataVal.isInstanceOf[Double]) {
           result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[Double])))
         } else {
-          throw new RuntimeException("unknown field type: " + dataVal.getClass)
+          // throw new RuntimeException("unknown field type: " + dataVal.getClass)
         }
       }
     }
@@ -132,9 +132,9 @@ object Node {
     ids.toSet
   }
 
-  def initialize(localhost: String, schemaFile: String, storagePath: String) {
-    val schema = Projection.create(FileUtil.readJson(schemaFile))
-    node = new Node(localhost, determineAllNodeIds(schema.dimensions), determineNodeIds(schema.dimensions), schema)
+  def initialize(localhost: String, projectionFile: String, storagePath: String) {
+    val projection = Projection.create(FileUtil.readJson(projectionFile))
+    node = new Node(localhost, determineAllNodeIds(projection.dimensions), determineNodeIds(projection.dimensions), projection)
     val storage = H2IndexStorage.create(storagePath)
     node.ids.par.foreach(id => node.storage.put(id, storage))
   }
@@ -187,7 +187,7 @@ object Node {
     records.foreach( record => {
       val dst = new JSONObject()
       selectedItems.foreach( rawPath => {
-        copyJsonObjectPath(record.rawData, dst, rawPath.split("_").toList)
+        copyJsonObjectPath(record.rawData, dst, rawPath.split("__").toList)
         newRecords.append(new Record(record.id, null, dst))
       })
     })
@@ -239,7 +239,7 @@ object Node {
         post("/records/queries", new RouteHandler {
           def exec(args: java.util.Map[String, String]): RouteResponse = {
             if (!args.containsKey("sql")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
-            val sql = args.get("sql")
+            val sql = args.get("sql").replace(".", "__") // TODO fix for doubles
             val (nodeSql, selectedItems, whereItems) = processSqlRequest(sql)
             val nodeIds = getNodeIds(node.projection, whereItems)
             val hostsMap = getNodeHosts(nodeIds)
