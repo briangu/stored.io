@@ -6,5 +6,12 @@ record={
   "mileage": 75000,
   "field1": val1,
   "field2": val1,
-  "field3": val1
+  "seat": {
+    "material": "leather",
+    "style": "bucket",
+    "safety": {
+      "rating": 5,
+      "beltstyle": "5-point"
+    }
+  }
 }

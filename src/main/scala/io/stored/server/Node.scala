@@ -1,10 +1,9 @@
 package io.stored.server
 
 import _root_.io.viper.core.server.router._
-import common.{ProjectionField, Projection, IndexStorage, Record}
+import common._
 import io.viper.common.{NestServer, RestServer}
 import org.jboss.netty.handler.codec.http.HttpResponseStatus
-import io.stored.common.FileUtil
 import org.json.{JSONArray, JSONObject}
 import io.stored.server.ext.storage.H2IndexStorage
 import collection.immutable._
@@ -15,21 +14,17 @@ import collection.mutable.{ListBuffer, SynchronizedMap}
 import sql.SqlRequestProcessor
 
 
-class Node(val localhost: String, val allNodeIds: Set[Int], val ids: Set[Int], val projection: Projection) {
-
-  val storage = new collection.mutable.HashMap[Int, IndexStorage] with SynchronizedMap[Int, IndexStorage]
-
-}
+class Node(val localhost: String, val localNode : IndexStorage, val projections: ProjectionsConfig) {}
 
 object Node {
 
   var node: Node = null
 
   def getNodeIds(projection: Projection, hashCoords: Map[String, List[BigInt]]) : Set[Int] = {
-    if (hashCoords == null || hashCoords.size == 0) return node.allNodeIds
+    if (hashCoords == null || hashCoords.size == 0) return projection.allNodeIds
 
     val intersection = hashCoords.keySet.intersect(projection.getFields)
-    if (intersection.size == 0) return node.allNodeIds
+    if (intersection.size == 0) return projection.allNodeIds
 
     // fill each project field with all appropriate values
     val fieldMap = new collection.mutable.HashMap[String, List[BigInt]]
@@ -56,7 +51,6 @@ object Node {
   }
 
   def genNodeIds(fields: List[String], proj: Projection, fieldMap: Map[String, List[BigInt]], nodeIds: collection.mutable.HashSet[Int], nodeIdPrefix: Int) {
-
     if (fields.size == 0) {
       nodeIds.add(nodeIdPrefix)
       return
@@ -72,12 +66,8 @@ object Node {
     }
   }
 
-  def getNodeHosts(nodeIds: Set[Int]) : Map[String, Set[Int]] = {
-    Map((node.localhost, Set(0))) // TODO: TOTAL HACK TO SHORT-CURCUIT SCATTER GATHER ON LOCALHOST
-  }
-
   // TODO: support multiple values for data map
-  def hashProjectionFields(projection: Projection, data: Map[String, AnyRef]) : Map[String, List[BigInt]] = {
+  def getProjectionCoords(projection: Projection, data: Map[String, AnyRef]) : Map[String, List[BigInt]] = {
     val result = new collection.mutable.HashMap[String, List[BigInt]] with SynchronizedMap[String, List[BigInt]]
     data.keySet.par.foreach{ key =>
       if (data.contains(key)) {
@@ -99,68 +89,45 @@ object Node {
     result.toMap
   }
 
-  def indexRecord(nodeIds: Set[Int], record: Record) {
+  def indexRecord(projection: Projection, nodeIds: Set[Int], record: Record) {
     nodeIds.par.foreach{ nodeId =>
-      if (node.ids.contains(nodeId)) {
-        node.storage.get(nodeId).get.add(record)
+      if (projection.localNodeIds.contains(nodeId)) {
+        indexRecord(record)
       } else {
-        indexRecord(findNodeHost(nodeId), record)
+        indexRecord(projection.getNodeIndexStorage(nodeId), record)
       }
     }
   }
 
-  def indexRecord(host: String, record: Record) {
+  def indexRecord(is: IndexStorage, record: Record) {}
 
+  def indexRecord(record: Record) = node.localNode.add(record)
+
+  def initialize(localhost: String, storagePath: String, nodesConfigFile: String, projectionsConfigFile: String) {
+    val localNode = H2IndexStorage.create(storagePath)
+    val projections = ProjectionsConfig.create(localhost, localNode, nodesConfigFile, projectionsConfigFile)
+    node = new Node(localhost, localNode, projections)
   }
 
-  def indexRecord(record: Record) {
-  }
-
-  def findNodeHost(nodeId: Int) : String = {
-    node.localhost
-  }
-
-  def determineNodeIds(dimensions: Int) : Set[Int] = {
-    val ids = new collection.mutable.HashSet[Int]
-    for (x <- 0 until math.pow(2, dimensions).toInt) ids.add(x)
-    ids.toSet
-  }
-
-  def determineAllNodeIds(dimensions: Int) : Set[Int] = {
-    val ids = new collection.mutable.HashSet[Int]
-    for (x <- 0 until math.pow(2, dimensions).toInt) ids.add(x)
-    ids.toSet
-  }
-
-  def initialize(localhost: String, projectionFile: String, storagePath: String) {
-    val projection = Projection.create(FileUtil.readJson(projectionFile))
-    node = new Node(localhost, determineAllNodeIds(projection.dimensions), determineNodeIds(projection.dimensions), projection)
-    val storage = H2IndexStorage.create(storagePath)
-    node.ids.par.foreach(id => node.storage.put(id, storage))
-  }
-
-  def queryHost(host: String, nodeIds: Set[Int], sql: String) : Map[Int, List[Record]] = {
+  def queryHost(host: IndexStorage, nodeIds: Set[Int], sql: String) : Map[Int, List[Record]] = {
     val resultMap = new collection.mutable.HashMap[Int, List[Record]] with SynchronizedMap[Int, List[Record]]
-    if (host.equals(node.localhost)) {
-      nodeIds.par.foreach(id => resultMap.put(id, node.storage.get(id).get.query(sql)))
+    if (host == node.localNode) {
+      val result = node.localNode.query(sql)
+      nodeIds.par.foreach(id => resultMap.put(id, result))
     } else {
+      //val result = host.query(nodeIds, sql)
       throw new RuntimeException("not yet supported")
     }
     resultMap.toMap
   }
 
   def processSqlRequest(sql: String) : (String, List[String], Map[String, List[BigInt]]) = {
-    val pm = new CCJSqlParserManager();
-
-    val statement = pm.parse(new StringReader(sql));
-
+    val pm = new CCJSqlParserManager
+    val statement = pm.parse(new StringReader(sql))
     if (!statement.isInstanceOf[Select]) throw new IllegalArgumentException("sql is not a select statement")
-
-    val selectStatement = statement.asInstanceOf[Select];
-
+    val selectStatement = statement.asInstanceOf[Select]
     val sqlRequestProcessor = new SqlRequestProcessor
     selectStatement.getSelectBody.accept(sqlRequestProcessor)
-
     (statement.toString, sqlRequestProcessor.selectItems, sqlRequestProcessor.whereItems.toMap)
   }
 
@@ -183,7 +150,6 @@ object Node {
     }
 
     val newRecords = new ListBuffer[Record]
-
     records.foreach( record => {
       val dst = new JSONObject()
       selectedItems.foreach( rawPath => {
@@ -191,24 +157,40 @@ object Node {
         newRecords.append(new Record(record.id, null, dst))
       })
     })
-
     newRecords.toList
+  }
+
+  def jsonResponse(args: AnyRef*) : JsonResponse = {
+    if (args.length % 2 != 0) throw new RuntimeException("expecting key value pairs")
+    val obj = new JSONObject
+    (0 until args.length by 2).foreach(i => obj.put(args(i).toString(), args(i+1)))
+    new JsonResponse(obj)
+  }
+
+  def getRequestedProjection(args: java.util.Map[String, String]) : Projection = {
+    if (args.containsKey("projection") && (node.projections.hasProjection(args.get("projection")))) {
+      node.projections.getProjection(args.get("projection"))
+    } else {
+      node.projections.getDefaultProjection
+    }
   }
 
   def main(args: Array[String]) {
 
     val localPort = args(0).toInt
-    val schemaFile = args(1)
-    val storagePath = args(2)
+    val storagePath = args(1)
+    val nodesConfigFile = args(2)
+    val projectionsConfigFile = args(3)
 
     processSqlRequest("select * from data_index")
     processSqlRequest("select * from data_index where color='red' and year in (1997,1998)")
     processSqlRequest("select manufacturer from data_index where color='red' and year in (1997,1998)")
 
-    initialize("http://localhost:%d".format(localPort), schemaFile, storagePath)
+    initialize("http://localhost:%d".format(localPort), storagePath, nodesConfigFile, projectionsConfigFile)
 
     NestServer.run(localPort, new RestServer {
       def addRoutes {
+
         // transform map into flat namespace map
         // perform hyperspace hashing on named fields using proj reference
         // store Record into table
@@ -220,29 +202,35 @@ object Node {
         //
         post("/records", new RouteHandler {
           def exec(args: java.util.Map[String, String]): RouteResponse = {
-            if (!args.containsKey("record")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+            if (!args.containsKey("record")) {
+              return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+            }
+
             val record = Record.create(args.get("record"))
+            val projection = getRequestedProjection(args)
 
-            val intersection = record.colMap.keySet.intersect(node.projection.getFields)
-            if (intersection.size != node.projection.getFields.size) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+            val intersection = record.colMap.keySet.intersect(projection.getFields)
+            if (intersection.size != projection.getFields.size) {
+              return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+            }
 
-            val hashCoords = hashProjectionFields(node.projection, record.colMap)
+            val coords = getProjectionCoords(projection, record.colMap)
+            val nodeIds = getNodeIds(projection, coords)
+            indexRecord(projection, nodeIds, record)
 
-            val nodeIds = getNodeIds(node.projection, hashCoords)
-            indexRecord(nodeIds, record)
-            val response = new JSONObject()
-            response.put("id", record.id)
-            new JsonResponse(response)
+            jsonResponse("id", record.id)
           }
         })
 
         post("/records/queries", new RouteHandler {
           def exec(args: java.util.Map[String, String]): RouteResponse = {
             if (!args.containsKey("sql")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
-            val sql = args.get("sql").replace(".", "__") // TODO fix for doubles
+            val projection = getRequestedProjection(args)
+
+            val sql = args.get("sql").replace(".", "__") // TODO correct using jsqlparser visitor
             val (nodeSql, selectedItems, whereItems) = processSqlRequest(sql)
-            val nodeIds = getNodeIds(node.projection, whereItems)
-            val hostsMap = getNodeHosts(nodeIds)
+            val nodeIds = getNodeIds(projection, whereItems)
+            val hostsMap = projection.getNodeHosts(nodeIds)
 
             var results : List[Record] = null
 
@@ -261,9 +249,7 @@ object Node {
 
             val elements = new JSONArray()
             filteredResults.foreach{ record => { elements.put( record.rawData) }}
-            val jsonResponse = new JSONObject()
-            jsonResponse.put("elements", elements)
-            new JsonResponse(jsonResponse)
+            jsonResponse("elements", elements)
           }
         })
 
@@ -273,16 +259,15 @@ object Node {
             if (!args.containsKey("node")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
             val sql = args.get("sql")
             val nodeId = args.get("node").toInt
+            val projection = getRequestedProjection(args)
 
-            if (!node.storage.contains(nodeId)) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+            if (!projection.localNodeIds.contains(nodeId)) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
 
-            val results = node.storage.get(nodeId).get.query(sql)
+            val results = node.localNode.query(sql)
 
-            val jsonResponse = new JSONObject()
             val elements = new JSONArray()
             results.foreach{ record => { elements.put( record.rawData) }}
-            jsonResponse.put("elements", elements)
-            new JsonResponse(jsonResponse)
+            jsonResponse("elements", elements)
           }
         })
     }})

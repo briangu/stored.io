@@ -1,6 +1,7 @@
 package io.stored.common;
 
 import org.apache.commons.io.IOUtils;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -15,6 +16,13 @@ public class FileUtil
   {
     String rawJson = readFile(path);
     JSONObject json = new JSONObject(rawJson);
+    return json;
+  }
+
+  public static JSONArray readJsonArray(String path) throws IOException, JSONException
+  {
+    String rawJson = readFile(path);
+    JSONArray json = new JSONArray(rawJson);
     return json;
   }
 

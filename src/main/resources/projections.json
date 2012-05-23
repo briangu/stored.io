@@ -1,0 +1,26 @@
+{
+  "default": "car",
+  "projections" : [
+    {
+      "name": "car",
+      "dimensions": 12,
+      "fields": {
+        "color": 3,
+        "year": 3,
+        "model": 2,
+        "manufacturer": 2,
+        "mileage": 2
+      }
+    },
+    {
+      "name": "tweet",
+      "doc": "TODO: support full-text search on text field"
+      "dimensions": 16,
+      "fields": {
+        "user.id": 8,
+        "user.screen_name": 4,
+        "text": 4
+      }
+    }
+  ]
+}
