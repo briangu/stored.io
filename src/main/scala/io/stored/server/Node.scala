@@ -121,7 +121,6 @@ object Node {
     resultMap.toMap
   }
 
-  // TODO: make table name configurable - maybe the projection name? map to DATA_INDEX
   def processSqlRequest(sql: String) : (String, String, List[String], Map[String, List[BigInt]]) = {
     val pm = new CCJSqlParserManager
     val statement = pm.parse(new StringReader(sql))
@@ -182,10 +181,6 @@ object Node {
     val storagePath = args(1)
     val nodesConfigFile = args(2)
     val projectionsConfigFile = args(3)
-
-    processSqlRequest("select * from data_index")
-    processSqlRequest("select * from data_index where color='red' and year in (1997,1998)")
-    processSqlRequest("select manufacturer from data_index where color='red' and year in (1997,1998)")
 
     initialize("http://localhost:%d".format(localPort), storagePath, nodesConfigFile, projectionsConfigFile)
 

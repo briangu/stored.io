@@ -179,6 +179,7 @@ class SqlRequestProcessor extends SelectVisitor with ExpressionVisitor
       def visit(p1: Table)
       {
         projectionName = p1.getName
+        p1.setName("DATA_INDEX")
       }
 
       def visit(p1: SubSelect)
