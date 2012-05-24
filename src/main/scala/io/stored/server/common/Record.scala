@@ -16,7 +16,7 @@ object Record {
 
     while(iter.hasNext) {
       val key = iter.next().asInstanceOf[String]
-      val refPath = "%s%s".format(path, key)
+      val refPath = "%s%s".format(path, key.toUpperCase)
       val ref = jsonData.get(key)
       if (ref.isInstanceOf[JSONObject]) {
         flatten(ref.asInstanceOf[JSONObject], refPath + "__", map)

@@ -133,7 +133,24 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     colMap
   }
 
-  private def createColumn(db: Connection, tableName: String, colName: String, colVal: AnyRef) {
+  private def createIndex(db: Connection, tableName: String, colName: String) {
+    var statement: PreparedStatement = null
+    try {
+      val sql = "CREATE INDEX %s_%s ON %s (%s)".format(tableName, colName, tableName, colName)
+      println(sql)
+      statement = db.prepareStatement(sql)
+      statement.execute
+    } catch {
+      case e: Exception => {
+        H2IndexStorage.log.error(e)
+      }
+    }
+    finally {
+      SqlUtil.SafeClose(statement)
+    }
+  }
+
+  private def createColumn(projection: Projection, db: Connection, tableName: String, colName: String, colVal: AnyRef) {
     _tableColumns.synchronized {
       if (!_tableColumns.contains(colName)) {
         var statement: PreparedStatement = null
@@ -153,10 +170,14 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
             throw new IllegalArgumentException("unknown obj type: " + colVal.getClass.toString)
           }
 
+          println("adding colname: " + colName)
+
           val sql = "ALTER TABLE %s ADD %s %s".format(tableName, colName, colType)
 
           statement = db.prepareStatement(sql)
           statement.execute
+
+          if (projection.getFields.contains(colName)) createIndex(db, tableName, colName)
 
           _tableColumns.add(colName)
         } catch {
@@ -171,7 +192,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     }
   }
 
-  private def add(nodeIds: Set[Int], db: Connection, tableName:String, record: Record) : String = {
+  private def add(projection: Projection, nodeIds: Set[Int], db: Connection, tableName:String, record: Record) : String = {
     var statement: PreparedStatement = null
     try {
       val colMap = filterColMap(record.colMap)
@@ -185,7 +206,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
 
       colMap.keySet.foreach{ colName => {
         val upColName = colName.toUpperCase
-        if (!_tableColumns.contains(upColName)) createColumn(db, tableName, upColName, colMap.get(colName).get)
+        if (!_tableColumns.contains(upColName)) createColumn(projection, db, tableName, upColName, colMap.get(colName).get)
       }}
 
       statement = db.prepareStatement(sql)
@@ -249,7 +270,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     var db: Connection = null
     try {
       db = getDbConnection
-      add(nodeIds, db, _tableName, datum)
+      add(projection, nodeIds, db, _tableName, datum)
     }
     catch {
       case e: JSONException => {
@@ -274,9 +295,9 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
       db.setAutoCommit(false)
       data.foreach{ record =>
         if (record.colMap == null) {
-          add(nodeIds, db,_tableName, Record.create(record.id, record.rawData))
+          add(projection, nodeIds, db,_tableName, Record.create(record.id, record.rawData))
         } else {
-          add(nodeIds, db,_tableName, record)
+          add(projection, nodeIds, db,_tableName, record)
         }
       }
       db.commit

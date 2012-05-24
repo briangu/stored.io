@@ -59,7 +59,7 @@ object Projection {
     val iter = fields.keys()
     while (iter.hasNext) {
       val key = iter.next().asInstanceOf[String]
-      val internalKey = key.replaceAll("\\.", "__")
+      val internalKey = key.replaceAll("\\.", "__").toUpperCase
       fieldMap.put(internalKey, ProjectionField.create(internalKey, fields.get(key)))
     }
 
