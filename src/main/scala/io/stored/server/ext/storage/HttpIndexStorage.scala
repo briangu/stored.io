@@ -3,8 +3,8 @@ package io.stored.server.ext.storage
 
 import io.stored.server.common.{Record, IndexStorage}
 import com.ning.http.client.AsyncHttpClient
-import org.json.JSONObject
 import collection.mutable.ListBuffer
+import org.json.{JSONArray, JSONObject}
 
 
 class HttpIndexStorage(host: String) extends IndexStorage
@@ -18,10 +18,20 @@ class HttpIndexStorage(host: String) extends IndexStorage
   def purge()
   {}
 
+  def toJsonArray(set: Set[Int]) : JSONArray = {
+    val jsonArray = new JSONArray
+    set.foreach(jsonArray.put)
+    jsonArray
+  }
+
   def query(nodeIds: Set[Int], sql: String) : List[Record] = {
     val asyncHttpClient = new AsyncHttpClient()
-    val f = asyncHttpClient.preparePost("%s/records/queries".format(host)).addParameter("sql",sql).execute
-    val response = f.get
+    val response = asyncHttpClient.
+      preparePost("%s/records/queries".format(host))
+      .addParameter("sql",sql)
+      .addParameter("nodeIds", toJsonArray(nodeIds).toString)
+      .execute
+      .get
     val jsonResponse = new JSONObject(response.getResponseBody)
     val elements = jsonResponse.getJSONArray("elements")
 
@@ -33,8 +43,12 @@ class HttpIndexStorage(host: String) extends IndexStorage
   def add(nodeIds: Set[Int], record: Record)
   {
     val asyncHttpClient = new AsyncHttpClient()
-    val f = asyncHttpClient.preparePost("%s/records".format(host)).addParameter("record",record.rawData.toString).execute
-    val response = f.get
+    val response = asyncHttpClient
+      .preparePost("%s/records".format(host))
+      .addParameter("record", record.rawData.toString)
+      .addParameter("nodeIds", toJsonArray(nodeIds).toString)
+      .execute
+      .get
     val jsonResponse = new JSONObject(response.getResponseBody)
     val id = jsonResponse.getString("id")
   }

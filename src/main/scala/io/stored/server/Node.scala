@@ -153,6 +153,13 @@ object Node {
     }
   }
 
+  def setFromJsonArray(rawJsonArray : String) : Set[Int] = {
+    val ja = new JSONArray(rawJsonArray)
+    val list = new ListBuffer[Int]
+    (0 until ja.length()).foreach(i => list.append(ja.getInt(i)))
+    list.toSet
+  }
+
   def main(args: Array[String]) {
 
     val localPort = args(0).toInt
@@ -189,7 +196,7 @@ object Node {
             }
 
             val coords = getProjectionCoords(projection, record.colMap)
-            val nodeIds = getNodeIds(projection, coords)
+            val nodeIds = if (args.containsKey("nodeIds")) setFromJsonArray(args.get("nodeIds")) else getNodeIds(projection, coords)
 
             val nodeMap = projection.getNodeHosts(nodeIds)
             nodeMap.keySet.par.foreach{node => indexRecord(node, nodeMap.get(node).get, record)}
@@ -206,7 +213,7 @@ object Node {
             val (projectionName, nodeSql, selectedItems, whereItems) = processSqlRequest(sql)
             if (!node.projections.hasProjection(projectionName)) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
             val projection = node.projections.getProjection(projectionName)
-            val nodeIds = getNodeIds(projection, whereItems)
+            val nodeIds = if (args.containsKey("nodeIds")) setFromJsonArray(args.get("nodeIds")) else getNodeIds(projection, whereItems)
             val nodeMap = projection.getNodeHosts(nodeIds)
 
             val results : List[Record] = if (nodeMap.keySet.size == 1) { // if (nodeIds.size == 1) {
