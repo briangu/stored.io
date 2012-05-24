@@ -17,13 +17,13 @@ class Projection(
   def getFieldValue(key: String) = fields.get(key).get
 
   def getNodeHosts(nodeIds: Set[Int]) : Map[IndexStorage, Set[Int]] = {
-    val nodeMap = new HashMap[IndexStorage, HashSet[Int] with SynchronizedSet[Int]] //with SynchronizedMap[IndexStorage, HashSet[Int] with SynchronizedSet[Int]]
+    val nodeMap = new HashMap[IndexStorage, collection.mutable.HashSet[Int] with SynchronizedSet[Int]] //with SynchronizedMap[IndexStorage, HashSet[Int] with SynchronizedSet[Int]]
     nodeIds.par.foreach { id =>
       val node = nodeHostMap.get(id).get
       if (!nodeMap.contains(node)) {
         nodeMap.synchronized {
           if (!nodeMap.contains(node)) {
-            nodeMap.put(node, new HashSet[Int] with SynchronizedSet[Int])
+            nodeMap.put(node, new collection.mutable.HashSet[Int] with SynchronizedSet[Int])
           }
         }
       }
@@ -47,11 +47,7 @@ object Projection {
     ids.toSet
   }
 
-  def determineAllNodeIds(dimensions: Int) : Set[Int] = {
-    val ids = new collection.mutable.HashSet[Int]
-    for (x <- 0 until math.pow(2, dimensions).toInt) ids.add(x)
-    ids.toSet
-  }
+  def determineAllNodeIds(dimensions: Int) : Set[Int] = (0 until math.pow(2, dimensions).toInt).toSet
 
   def create(obj: JSONObject, nodesConfig: NodesConfig) : Projection = {
 
@@ -71,7 +67,7 @@ object Projection {
     val localNodeIds = new collection.mutable.HashSet[Int] with SynchronizedSet[Int]
     val nodeMap = new collection.mutable.HashMap[Int, IndexStorage] with SynchronizedMap[Int, IndexStorage]
     allNodeIds.par.foreach{id =>
-      val mod = id % dimensions
+      val mod = id % nodesConfig.nodes.size
       if (mod == nodesConfig.localNodeIndex) localNodeIds.add(id)
       nodeMap.put(id, nodesConfig.hostStorage.get(mod).get)
     }

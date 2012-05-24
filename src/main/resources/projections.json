@@ -14,7 +14,7 @@
     },
     {
       "name": "tweet",
-      "doc": "TODO: support full-text search on text field"
+      "doc": "TODO: support full-text search on text field",
       "dimensions": 16,
       "fields": {
         "user.id": 8,

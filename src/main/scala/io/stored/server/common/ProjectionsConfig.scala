@@ -11,7 +11,7 @@ class ProjectionsConfig(projections: Map[String, Projection], val defaultProject
 {
   def getDefaultProjection: Projection = defaultProjection
   def hasProjection(name: String) : Boolean = projections.contains(name)
-  def getProjection(name: String) : Projection = projections.get("name").get
+  def getProjection(name: String) : Projection = projections.get(name).get
 }
 
 object ProjectionsConfig

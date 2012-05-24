@@ -204,7 +204,7 @@ object Node {
 
             val sql = args.get("sql").replace(".", "__") // TODO correct using jsqlparser visitor
             val (projectionName, nodeSql, selectedItems, whereItems) = processSqlRequest(sql)
-            if (node.projections.hasProjection(projectionName)) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+            if (!node.projections.hasProjection(projectionName)) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
             val projection = node.projections.getProjection(projectionName)
             val nodeIds = getNodeIds(projection, whereItems)
             val nodeMap = projection.getNodeHosts(nodeIds)
