@@ -82,7 +82,7 @@ object Node {
         } else if (dataVal.isInstanceOf[Double]) {
           result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[Double])))
         } else {
-          // throw new RuntimeException("unknown field type: " + dataVal.getClass)
+          // skip fields we can't hash
         }
       }
     }
