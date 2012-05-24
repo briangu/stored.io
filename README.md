@@ -2,7 +2,8 @@ Summary
 =======
 
 Stored.io (store-d) is a schema-less JSON object store that supports native SQL.
-To make it scale, it is a distributed system that uses hyperspace hashing and hypercube addressing schemes.
+To make it scale, it is a distributed system that uses hyperspace hashing (projections) and hypercube addressing to map nodes to regions of the hyperspace.
+Since projections are really useful, they may both be added dynamically and used dynamically (as the SQL from clause).
 
 From a developer's perspective, the system is schemaless because they never have to create them.  This is in the spirit of MongoDB.
 The system also supports native SQL on the added JSON Objects.
@@ -63,7 +64,7 @@ The following columns are created:
     seat.safety.rating
     seat.safety.beltstyle
 
-Standard SQL is supported such that:
+Standard SQL is supported such that (cars is the hyperspace hashing projection we are using):
 
     select seat.material from cars where seat.safety.rating = 5
 
@@ -136,6 +137,36 @@ yielding:
 
 Everytime you add new data to the system, columns will automatically be created for you.
 However, only the columns specified in the hyperspace schema in config.json will be used to improve performance.
+
+Projections
+===========
+
+    {
+      "default": "cars",
+      "projections" : [
+        {
+          "name": "cars",
+          "dimensions": 12,
+          "fields": {
+            "color": 3,
+            "year": 3,
+            "model": 2,
+            "manufacturer": 2,
+            "mileage": 2
+          }
+        },
+        {
+          "name": "tweets",
+          "doc": "TODO: support full-text search on text field",
+          "dimensions": 10,
+          "fields": {
+            "user.id": 6,
+            "user.screen_name": 2,
+            "text": 2
+          }
+        }
+      ]
+    }
 
 Internals
 =========

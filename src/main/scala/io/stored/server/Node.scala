@@ -165,7 +165,7 @@ object Node {
     list.toSet
   }
 
-  // 8080 /home/bguarrac/scm/stored.io/src/main/resources/db src/main/resources/nodes.json src/main/resources/projections.json
+  // 8080 src/main/resources/db src/main/resources/nodes.json src/main/resources/projections.json
   def main(args: Array[String]) {
 
     val localPort = args(0).toInt
