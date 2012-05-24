@@ -171,7 +171,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     }
   }
 
-  private def add(db: Connection, tableName:String, record: Record)
+  private def add(nodeIds: Set[Int], db: Connection, tableName:String, record: Record)
   {
     var statement: PreparedStatement = null
     try {
@@ -243,12 +243,12 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     }
   }
 
-  def add(datum: Record) {
+  def add(nodeIds: Set[Int], datum: Record) {
     if (datum == null) return
     var db: Connection = null
     try {
       db = getDbConnection
-      add(db, _tableName, datum)
+      add(nodeIds, db, _tableName, datum)
     }
     catch {
       case e: JSONException => {
@@ -263,7 +263,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     }
   }
 
-  def addAll(data: List[Record]) {
+  def addAll(nodeIds: Set[Int], data: List[Record]) {
     if (data == null) return
     var db: Connection = null
     try {
@@ -271,9 +271,9 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
       db.setAutoCommit(false)
       data.foreach{ record =>
         if (record.colMap == null) {
-          add(db,_tableName, Record.create(record.id, record.rawData))
+          add(nodeIds, db,_tableName, Record.create(record.id, record.rawData))
         } else {
-          add(db,_tableName, record)
+          add(nodeIds, db,_tableName, record)
         }
       }
       db.commit
@@ -291,7 +291,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     }
   }
 
-  def remove(id: String) {
+  def remove(nodeIds: Set[Int], id: String) {
     var db: Connection = null
     try {
       db = getDbConnection
@@ -313,19 +313,9 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     }
   }
 
-  /***
-   * Build a query from a filter description.
-   *
-   * @param filter
-   * @return
-   */
-  def query(filter: JSONObject) : List[Record] = {
-    null
-  }
-
   // BUG: if sql is not select * then we may not get HASH,RAWDATA back
   // TODO: we should really be building our queries for the caller so they dont need to know the inner details
-  def query(sql: String): List[Record] = {
+  def query(nodeIds: Set[Int], sql: String): List[Record] = {
     val results = new ListBuffer[Record]
 
     var db: Connection = null

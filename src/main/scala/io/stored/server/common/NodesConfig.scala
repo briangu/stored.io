@@ -28,6 +28,7 @@ object NodesConfig {
       if (host.equals(localhost)) {
         localNodeIndex = i
         nodes.append(localNode)
+        hostStorage.put(i, localNode)
       } else {
         val storage = HttpIndexStorage.create(host)
         hostStorage.put(i, storage)

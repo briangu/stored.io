@@ -60,13 +60,8 @@ object Projection {
     val nodeMap = new collection.mutable.HashMap[Int, IndexStorage] with SynchronizedMap[Int, IndexStorage]
     allNodeIds.par.foreach{id =>
       val mod = id % dimensions
-      if (mod == nodesConfig.localNodeIndex) {
-        // TODO: we currently don't put the localhost nodes in the nodemap because we should shortcurcuit
-        //       and not do an http request to localhost
-        localNodeIds.add(id)
-      } else {
-        nodeMap.put(id, nodesConfig.hostStorage.get(mod).get)
-      }
+      if (mod == nodesConfig.localNodeIndex) localNodeIds.add(id)
+      nodeMap.put(id, nodesConfig.hostStorage.get(mod).get)
     }
 
     new Projection(name, dimensions, fieldMap, allNodeIds, localNodeIds.toSet, nodeMap.toMap)
