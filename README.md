@@ -4,7 +4,7 @@ Summary
 Stored.io (store-d) is a schema-less JSON object store that supports native SQL.
 To make it scale, it is a distributed system that uses hyperspace hashing and hypercube addressing schemes.
 
-From a developer's perspective, the system is schemas because they never have to create them.  This is in the spirit of MongoDB.
+From a developer's perspective, the system is schemaless because they never have to create them.  This is in the spirit of MongoDB.
 The system also supports native SQL on the added JSON Objects.
 When an object is added, the object is flattened automatically producing columns for each key-value path.
 
