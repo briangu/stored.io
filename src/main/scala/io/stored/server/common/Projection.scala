@@ -1,8 +1,8 @@
 package io.stored.server.common
 
 import org.json.JSONObject
-import io.stored.server.ext.storage.HttpIndexStorage
-import collection.mutable.{SynchronizedSet, HashMap, SynchronizedMap, LinkedHashMap}
+import collection.immutable._
+import collection.mutable.{LinkedHashMap, SynchronizedMap, SynchronizedSet, HashMap}
 
 
 class Projection(
@@ -17,11 +17,23 @@ class Projection(
   def getFieldValue(key: String) = fields.get(key).get
 
   def getNodeHosts(nodeIds: Set[Int]) : Map[IndexStorage, Set[Int]] = {
-    val nodeMap = new collection.mutable.HashMap[IndexStorage, Set[Int]] with SynchronizedMap[IndexStorage, Set[Int]]
-
-    // TODO: fix me
-
+    val nodeMap = new HashMap[IndexStorage, HashSet[Int] with SynchronizedSet[Int]] //with SynchronizedMap[IndexStorage, HashSet[Int] with SynchronizedSet[Int]]
+    nodeIds.par.foreach { id =>
+      val node = nodeHostMap.get(id).get
+      if (!nodeMap.contains(node)) {
+        nodeMap.synchronized {
+          if (!nodeMap.contains(node)) {
+            nodeMap.put(node, new HashSet[Int] with SynchronizedSet[Int])
+          }
+        }
+      }
+      nodeMap.get(node).get.add(id)
+    }
     nodeMap.toMap
+
+    val resultMap = new HashMap[IndexStorage, Set[Int]]
+    nodeMap.keySet.foreach( key => resultMap.put(key, nodeMap.get(key).get.toSet))
+    resultMap.toMap
   }
 
   def getNodeIndexStorage(nodeId: Int) : IndexStorage = nodeHostMap.get(nodeId).get
