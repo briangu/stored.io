@@ -31,7 +31,7 @@ object Record {
             || ref.isInstanceOf[Boolean]) {
           map.put(refPath, ref)
         } else {
-          println("skipping key: " + refPath)
+//          println("skipping key: " + refPath)
         }
       }
     }

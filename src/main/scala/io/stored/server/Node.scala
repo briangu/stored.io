@@ -89,7 +89,9 @@ object Node {
     result.toMap
   }
 
-  def indexRecord(is: IndexStorage, nodeIds: Set[Int], record: Record) = is.add(nodeIds, record)
+  def indexRecord(projection: Projection, is: IndexStorage, nodeIds: Set[Int], record: Record) = {
+    is.add(projection, nodeIds, record)
+  }
 
   def initialize(localhost: String, storagePath: String, nodesConfigFile: String, projectionsConfigFile: String) {
     val localNode = H2IndexStorage.create(storagePath)
@@ -97,7 +99,9 @@ object Node {
     node = new Node(localNode, projections)
   }
 
-  def queryNode(is: IndexStorage, nodeIds: Set[Int], sql: String) : List[Record] = is.query(nodeIds, sql)
+  def queryNode(projection: Projection, is: IndexStorage, nodeIds: Set[Int], sql: String) : List[Record] = {
+    is.query(projection, nodeIds, sql)
+  }
 
   def processSqlRequest(sql: String) : (String, String, List[String], Map[String, List[BigInt]]) = {
     val pm = new CCJSqlParserManager
@@ -160,6 +164,7 @@ object Node {
     list.toSet
   }
 
+  // 8080 /home/bguarrac/scm/stored.io/src/main/resources/db src/main/resources/nodes.json src/main/resources/projections.json
   def main(args: Array[String]) {
 
     val localPort = args(0).toInt
@@ -199,8 +204,9 @@ object Node {
             val nodeIds = if (args.containsKey("nodeIds")) setFromJsonArray(args.get("nodeIds")) else getNodeIds(projection, coords)
 
             val nodeMap = projection.getNodeHosts(nodeIds)
-            nodeMap.keySet.par.foreach{node => indexRecord(node, nodeMap.get(node).get, record)}
+            nodeMap.keySet.par.foreach{node => indexRecord(projection, node, nodeMap.get(node).get, record)}
 
+            println("indexed " + record.id)
             jsonResponse("id", record.id)
           }
         })
@@ -217,16 +223,16 @@ object Node {
             val nodeMap = projection.getNodeHosts(nodeIds)
 
             val results : List[Record] = if (nodeMap.keySet.size == 1) { // if (nodeIds.size == 1) {
-              queryNode(projection.getNodeIndexStorage(nodeIds.toList(0)), nodeIds, nodeSql)
+              queryNode(projection, projection.getNodeIndexStorage(nodeIds.toList(0)), nodeIds, nodeSql)
             } else {
               var mergedResults : List[Record] = null
               val mergeDb = H2IndexStorage.createInMemoryDb
               try {
                 nodeMap.keySet.par.foreach{node =>
                   val nodeMapIds = nodeMap.get(node).get
-                  mergeDb.addAll(nodeMapIds, queryNode(node, nodeMapIds, nodeSql))
+                  mergeDb.addAll(projection, nodeMapIds, queryNode(projection, node, nodeMapIds, nodeSql))
                 }
-                mergedResults = mergeDb.query(nodeIds, nodeSql) // TODO: null may be better for nodeIds
+                mergedResults = mergeDb.query(projection, nodeIds, nodeSql) // TODO: null may be better for nodeIds
               } finally {
                 mergeDb.shutdown()
               }

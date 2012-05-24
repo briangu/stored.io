@@ -1,8 +1,8 @@
 {
-  "default": "car",
+  "default": "cars",
   "projections" : [
     {
-      "name": "car",
+      "name": "cars",
       "dimensions": 12,
       "fields": {
         "color": 3,
@@ -13,7 +13,7 @@
       }
     },
     {
-      "name": "tweet",
+      "name": "tweets",
       "doc": "TODO: support full-text search on text field",
       "dimensions": 16,
       "fields": {

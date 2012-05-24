@@ -6,9 +6,9 @@ import org.json.JSONException
 import org.json.JSONObject
 import java.io.File
 import java.sql._
-import io.stored.server.common.{Record, IndexStorage}
 import io.stored.common.SqlUtil
 import collection.mutable.{ListBuffer, SynchronizedSet, HashSet}
+import io.stored.server.common.{Projection, Record, IndexStorage}
 
 
 object H2IndexStorage {
@@ -171,8 +171,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     }
   }
 
-  private def add(nodeIds: Set[Int], db: Connection, tableName:String, record: Record)
-  {
+  private def add(nodeIds: Set[Int], db: Connection, tableName:String, record: Record) : String = {
     var statement: PreparedStatement = null
     try {
       val colMap = filterColMap(record.colMap)
@@ -200,10 +199,12 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
       }}
 
       statement.execute
+      record.id
     }
     catch {
       case e: Exception => {
         H2IndexStorage.log.error(e)
+        null
       }
     }
     finally {
@@ -243,8 +244,8 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     }
   }
 
-  def add(nodeIds: Set[Int], datum: Record) {
-    if (datum == null) return
+  def add(projection: Projection, nodeIds: Set[Int], datum: Record) : String = {
+    if (datum == null) return null
     var db: Connection = null
     try {
       db = getDbConnection
@@ -253,9 +254,11 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     catch {
       case e: JSONException => {
         H2IndexStorage.log.error(e)
+        null
       }
       case e: SQLException => {
         H2IndexStorage.log.error(e)
+        null
       }
     }
     finally {
@@ -263,8 +266,8 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     }
   }
 
-  def addAll(nodeIds: Set[Int], data: List[Record]) {
-    if (data == null) return
+  def addAll(projection: Projection, nodeIds: Set[Int], data: List[Record]) : List[String] = {
+    if (data == null) return null
     var db: Connection = null
     try {
       db = getDbConnection
@@ -277,13 +280,16 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
         }
       }
       db.commit
+      null // TODO: fix
     }
     catch {
       case e: JSONException => {
         H2IndexStorage.log.error(e)
+        null
       }
       case e: SQLException => {
         H2IndexStorage.log.error(e)
+        null
       }
     }
     finally {
@@ -315,7 +321,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
 
   // BUG: if sql is not select * then we may not get HASH,RAWDATA back
   // TODO: we should really be building our queries for the caller so they dont need to know the inner details
-  def query(nodeIds: Set[Int], sql: String): List[Record] = {
+  def query(projection: Projection, nodeIds: Set[Int], sql: String): List[Record] = {
     val results = new ListBuffer[Record]
 
     var db: Connection = null

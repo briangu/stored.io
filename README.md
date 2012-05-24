@@ -58,14 +58,14 @@ The following columns are created:
     mileage
     field1
     field2
-    seat_material
-    seat_style
-    seat_safety_rating
-    seat_safety_beltstyle
+    seat.material
+    seat.style
+    seat.safety.rating
+    seat.safety.beltstyle
 
 Standard SQL is supported such that:
 
-    select seat_material from data_index where seat_safety_rating = 5
+    select seat.material from cars where seat.safety.rating = 5
 
 Produces:
 
@@ -111,15 +111,15 @@ Add data to the store:
 
 Query data from the store using plain-old-sql:
 
-    curl --data-urlencode "sql=select * from data_index where seat_material = 'leather'" http://localhost:8080/records/queries
+    curl --data-urlencode "sql=select * from cars where seat.material = 'leather'" http://localhost:8080/records/queries
 
 or
 
-    curl --data-urlencode "sql=select * from data_index where seat_safety_rating = 5" http://localhost:8080/records/queries
+    curl --data-urlencode "sql=select * from cars where seat.safety.rating = 5" http://localhost:8080/records/queries
 
 or SELECT a portion of the object:
 
-    curl --data-urlencode "sql=select seat_material from data_index where seat_safety_rating = 5" http://localhost:8080/records/queries
+    curl --data-urlencode "sql=select seat.material from cars where seat.safety.rating = 5" http://localhost:8080/records/queries
 
 yielding:
 

@@ -58,8 +58,9 @@ object Projection {
     val fieldMap = new LinkedHashMap[String, ProjectionField]
     val iter = fields.keys()
     while (iter.hasNext) {
-      val key = iter.next().asInstanceOf[String];
-      fieldMap.put(key, ProjectionField.create(key, fields.get(key)))
+      val key = iter.next().asInstanceOf[String]
+      val internalKey = key.replaceAll("\\.", "__")
+      fieldMap.put(internalKey, ProjectionField.create(internalKey, fields.get(key)))
     }
 
     val allNodeIds = determineAllNodeIds(dimensions)

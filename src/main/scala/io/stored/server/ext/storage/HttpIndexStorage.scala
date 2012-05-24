@@ -1,14 +1,16 @@
 package io.stored.server.ext.storage
 
 
-import io.stored.server.common.{Record, IndexStorage}
 import com.ning.http.client.AsyncHttpClient
 import collection.mutable.ListBuffer
 import org.json.{JSONArray, JSONObject}
+import io.stored.server.common.{Projection, Record, IndexStorage}
 
 
 class HttpIndexStorage(host: String) extends IndexStorage
 {
+  val asyncHttpClient = new AsyncHttpClient()
+
   def init()
   {}
 
@@ -24,8 +26,7 @@ class HttpIndexStorage(host: String) extends IndexStorage
     jsonArray
   }
 
-  def query(nodeIds: Set[Int], sql: String) : List[Record] = {
-    val asyncHttpClient = new AsyncHttpClient()
+  def query(projection: Projection, nodeIds: Set[Int], sql: String) : List[Record] = {
     val response = asyncHttpClient.
       preparePost("%s/records/queries".format(host))
       .addParameter("sql",sql)
@@ -40,22 +41,30 @@ class HttpIndexStorage(host: String) extends IndexStorage
     results.toList
   }
 
-  def add(nodeIds: Set[Int], record: Record)
-  {
-    val asyncHttpClient = new AsyncHttpClient()
+  def add(projection: Projection, nodeIds: Set[Int], record: Record) : String = {
     val response = asyncHttpClient
       .preparePost("%s/records".format(host))
       .addParameter("record", record.rawData.toString)
+      .addParameter("projection", projection.name)
       .addParameter("nodeIds", toJsonArray(nodeIds).toString)
       .execute
       .get
-    val jsonResponse = new JSONObject(response.getResponseBody)
-    val id = jsonResponse.getString("id")
+    val responseBody = response.getResponseBody
+    if (responseBody.startsWith("{")) {
+      val jsonResponse = new JSONObject()
+      if (jsonResponse.has("id")) {
+        jsonResponse.getString("id")
+      } else {
+        null
+      }
+    } else {
+      null
+    }
   }
 
-  def addAll(nodeIds: Set[Int], records: List[Record])
-  {
-    records.foreach(add(null, _))
+  def addAll(projection: Projection, nodeIds: Set[Int], records: List[Record]) : List[String] = {
+    records.foreach(add(projection, null, _))
+    null
   }
 
   def remove(nodeIds: Set[Int], id: String)
