@@ -209,7 +209,7 @@ object Node {
             val nodeIds = getNodeIds(projection, whereItems)
             val nodeMap = projection.getNodeHosts(nodeIds)
 
-            val results : List[Record] = if (nodeIds.size == 1) {
+            val results : List[Record] = if (nodeMap.keySet.size == 1) { // if (nodeIds.size == 1) {
               queryNode(projection.getNodeIndexStorage(nodeIds.toList(0)), nodeIds, nodeSql)
             } else {
               var mergedResults : List[Record] = null
