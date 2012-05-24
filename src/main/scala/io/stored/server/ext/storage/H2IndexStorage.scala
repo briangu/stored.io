@@ -150,7 +150,9 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     }
   }
 
-  private def createColumn(projection: Projection, db: Connection, tableName: String, colName: String, colVal: AnyRef) {
+  private def createColumn(projection: Projection, db: Connection, tableName: String, colName: String, colVal: AnyRef) : Boolean = {
+    if (colName.length > 32) return false
+
     _tableColumns.synchronized {
       if (!_tableColumns.contains(colName)) {
         var statement: PreparedStatement = null
@@ -162,7 +164,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
           } else if (colVal.isInstanceOf[Long]) {
             colType = "LONG"
           } else if (colVal.isInstanceOf[Int]) {
-            colType = "INTEGER"
+            colType = "LONG"
           } else if (colVal.isInstanceOf[Boolean]) {
             colType = "BOOLEAN"
           } else {
@@ -170,7 +172,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
             throw new IllegalArgumentException("unknown obj type: " + colVal.getClass.toString)
           }
 
-          println("adding colname: " + colName)
+          println("adding colname: " + colName + " of type " + colType)
 
           val sql = "ALTER TABLE %s ADD %s %s".format(tableName, colName, colType)
 
@@ -190,31 +192,40 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
         }
       }
     }
+
+    true
   }
 
   private def add(projection: Projection, nodeIds: Set[Int], db: Connection, tableName:String, record: Record) : String = {
     var statement: PreparedStatement = null
     try {
       val colMap = filterColMap(record.colMap)
-      val cols = colMap.keySet
+      var cols = colMap.keySet
       if (cols.size == 0) throw new IllegalArgumentException("filtered colMap has no data to index")
+
+      val removeCols = new HashSet[String] with SynchronizedSet[String]
+      cols.foreach{ colName => {
+        val upColName = colName.toUpperCase
+        if (!_tableColumns.contains(upColName)) {
+          if (!createColumn(projection, db, tableName, upColName, colMap.get(colName).get)) {
+            removeCols.add(colName)
+          }
+        }
+      }}
+
+      cols = cols.filter(!removeCols.contains(_))
 
       val sql = "MERGE INTO %s (HASH,RAWDATA,%s) VALUES (?,?,%s);".format(
         tableName,
         cols.mkString(","),
         List.fill(cols.size)("?").mkString(","))
 
-      colMap.keySet.foreach{ colName => {
-        val upColName = colName.toUpperCase
-        if (!_tableColumns.contains(upColName)) createColumn(projection, db, tableName, upColName, colMap.get(colName).get)
-      }}
-
       statement = db.prepareStatement(sql)
       bind(statement, 1, record.id)
       bind(statement, 2, record.rawData.toString)
 
       var idx = 3
-      colMap.keySet.foreach{ colName => {
+      cols.foreach{ colName => {
         bind(statement, idx, colMap.get(colName).get)
         idx += 1
       }}

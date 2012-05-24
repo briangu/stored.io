@@ -82,6 +82,7 @@ object Node {
         } else if (dataVal.isInstanceOf[Double]) {
           result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[Double])))
         } else {
+          println("not hashing col: " + key)
           // skip fields we can't hash
         }
       }

@@ -15,11 +15,11 @@
     {
       "name": "tweets",
       "doc": "TODO: support full-text search on text field",
-      "dimensions": 16,
+      "dimensions": 10,
       "fields": {
-        "user.id": 8,
-        "user.screen_name": 4,
-        "text": 4
+        "user.id": 6,
+        "user.screen_name": 2,
+        "text": 2
       }
     }
   ]

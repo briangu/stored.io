@@ -33,12 +33,21 @@ class HttpIndexStorage(host: String) extends IndexStorage
       .addParameter("nodeIds", toJsonArray(nodeIds).toString)
       .execute
       .get
-    val jsonResponse = new JSONObject(response.getResponseBody)
-    val elements = jsonResponse.getJSONArray("elements")
+    val responseBody = response.getResponseBody
+    if (responseBody.startsWith("{")) {
+      val jsonResponse = new JSONObject(responseBody)
+      if (jsonResponse.has("elements")) {
+        val elements = jsonResponse.getJSONArray("elements")
 
-    val results = new ListBuffer[Record]
-    (0 until elements.length()).foreach(i => results.append(Record.create(elements.getJSONObject(i))))
-    results.toList
+        val results = new ListBuffer[Record]
+        (0 until elements.length()).foreach(i => results.append(Record.create(elements.getJSONObject(i))))
+        results.toList
+      } else {
+        List()
+      }
+    } else {
+      List()
+    }
   }
 
   def add(projection: Projection, nodeIds: Set[Int], record: Record) : String = {
