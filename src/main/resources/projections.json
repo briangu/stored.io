@@ -21,6 +21,16 @@
         "user.screen_name": 2,
         "text": 2
       }
+    },
+    {
+      "name": "glu",
+      "dimensions": 12,
+      "fields": {
+        "agent": 6,
+        "metadata.container.kind": 2,
+        "metadata.container.name": 2,
+        "mountPoint": 2
+      }
     }
   ]
 }

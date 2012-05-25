@@ -194,7 +194,12 @@ class SqlRequestProcessor extends SelectVisitor with ExpressionVisitor
     {
       for (i <- 0 until sqlSelectItems.size())
       {
-        originalSelectItems.append(sqlSelectItems.get(i).toString)
+        val selectItem = sqlSelectItems.get(i).toString
+
+        // TODO: there has to be a better way with jsqlparser!
+        if (!selectItem.toUpperCase.startsWith("COUNT")) {
+          originalSelectItems.append(selectItem)
+        }
       }
       plainSelect.setSelectItems(Arrays.asList("*"))
     }

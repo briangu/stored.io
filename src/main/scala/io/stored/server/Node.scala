@@ -173,7 +173,11 @@ object Node {
     val nodesConfigFile = args(2)
     val projectionsConfigFile = args(3)
 
+    println("booting...")
+
     initialize("http://localhost:%d".format(localPort), storagePath, nodesConfigFile, projectionsConfigFile)
+
+    println("ready!")
 
     NestServer.run(localPort, new RestServer {
       def addRoutes {
@@ -223,7 +227,7 @@ object Node {
             val nodeIds = if (args.containsKey("nodeIds")) setFromJsonArray(args.get("nodeIds")) else getNodeIds(projection, whereItems)
             val nodeMap = projection.getNodeHosts(nodeIds)
 
-            val results : List[Record] = if (nodeMap.keySet.size == 1) { // if (nodeIds.size == 1) {
+            val results : List[Record] = if (nodeMap.keySet.size == 1) {
               queryNode(projection, projection.getNodeIndexStorage(nodeIds.toList(0)), nodeIds, nodeSql)
             } else {
               var mergedResults : List[Record] = null
