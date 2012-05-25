@@ -1,0 +1,15 @@
+Concurrency Level:      16
+Time taken for tests:   27.858 seconds
+Complete requests:      10000
+Failed requests:        0
+Write errors:           0
+Total transferred:      3160000 bytes
+Total POSTed:           2440000
+HTML transferred:       2230000 bytes
+Requests per second:    358.97 [#/sec] (mean)
+Time per request:       44.573 [ms] (mean)
+Time per request:       2.786 [ms] (mean, across all concurrent requests)
+Transfer rate:          110.77 [Kbytes/sec] received
+                        85.53 kb/s sent
+                        196.31 kb/s total
+
