@@ -205,9 +205,8 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
 
       val removeCols = new HashSet[String] with SynchronizedSet[String]
       cols.foreach{ colName => {
-        val upColName = colName.toUpperCase
-        if (!_tableColumns.contains(upColName)) {
-          if (!createColumn(projection, db, tableName, upColName, colMap.get(colName).get)) {
+        if (!_tableColumns.contains(colName)) {
+          if (!createColumn(projection, db, tableName, colName, colMap.get(colName).get)) {
             removeCols.add(colName)
           }
         }

@@ -15,8 +15,7 @@ class ItemListValuesExtractor extends ItemsListVisitor
 
   def getValues = columnValues.toList
 
-  def visit(p1: SubSelect)
-  {}
+  def visit(p1: SubSelect) {}
 
   def visit(p1: ExpressionList)
   {

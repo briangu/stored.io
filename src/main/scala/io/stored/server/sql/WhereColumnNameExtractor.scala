@@ -1,29 +1,30 @@
 package io.stored.server.sql
 
 
+import net.sf.jsqlparser.expression.operators.relational._
+import net.sf.jsqlparser.expression.operators.conditional.{AndExpression, OrExpression}
 import net.sf.jsqlparser.expression._
-import net.sf.jsqlparser.statement.select.SubSelect
-import net.sf.jsqlparser.schema.Column
 import operators.arithmetic._
-import operators.conditional.{AndExpression, OrExpression}
-import operators.relational._
-import io.stored.server.common.ProjectionField
+import net.sf.jsqlparser.statement.select.SubSelect
+import net.sf.jsqlparser.schema.{Table, Column}
 
 
-class ExpressionValueExtractor extends ExpressionVisitor {
-  var expressionValue: BigInt = null
+class WhereColumnNameExtractor extends ExpressionVisitor {
+  var columnName: String = null
+
+  private final val emptyTable = new Table
 
   def visit(p1: NullValue) {}
   def visit(p1: Function) {}
   def visit(p1: InverseExpression) {}
   def visit(p1: JdbcParameter) {}
-  def visit(p1: DoubleValue) = expressionValue = ProjectionField.md5Hash(p1.getValue)
-  def visit(p1: LongValue) = expressionValue = ProjectionField.md5Hash(p1.getValue)
-  def visit(p1: StringValue) = expressionValue = ProjectionField.md5Hash(p1.getValue)
+  def visit(p1: DoubleValue) {}
+  def visit(p1: LongValue) {}
   def visit(p1: DateValue) {}
   def visit(p1: TimeValue) {}
   def visit(p1: TimestampValue) {}
   def visit(p1: Parenthesis) {}
+  def visit(p1: StringValue) {}
   def visit(p1: Addition) {}
   def visit(p1: Division) {}
   def visit(p1: Multiplication) {}
@@ -40,7 +41,6 @@ class ExpressionValueExtractor extends ExpressionVisitor {
   def visit(p1: MinorThan) {}
   def visit(p1: MinorThanEquals) {}
   def visit(p1: NotEqualsTo) {}
-  def visit(p1: Column) {}
   def visit(p1: SubSelect) {}
   def visit(p1: CaseExpression) {}
   def visit(p1: WhenClause) {}
@@ -52,4 +52,11 @@ class ExpressionValueExtractor extends ExpressionVisitor {
   def visit(p1: BitwiseAnd) {}
   def visit(p1: BitwiseOr) {}
   def visit(p1: BitwiseXor) {}
+
+  // Where-clause columns are used as Projection columns if they are in the projection
+  def visit(p1: Column) {
+    columnName = "%s__%s".toUpperCase.format(p1.getTable, p1.getColumnName)
+    p1.setTable(emptyTable)
+    p1.setColumnName(columnName)
+  }
 }
