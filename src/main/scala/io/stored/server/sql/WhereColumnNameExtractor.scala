@@ -55,7 +55,7 @@ class WhereColumnNameExtractor extends ExpressionVisitor {
 
   // Where-clause columns are used as Projection columns if they are in the projection
   def visit(p1: Column) {
-    columnName = "%s__%s".toUpperCase.format(p1.getTable, p1.getColumnName)
+    columnName = if (p1.getTable.getName == null) p1.getColumnName else "%s__%s".toUpperCase.format(p1.getTable, p1.getColumnName)
     p1.setTable(emptyTable)
     p1.setColumnName(columnName)
   }

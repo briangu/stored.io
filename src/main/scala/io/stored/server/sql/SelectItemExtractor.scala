@@ -85,7 +85,7 @@ class SelectItemExtractor extends SelectItemVisitor with ExpressionVisitor {
   // Extract select-clause columns for JSON data extraction.
   // Note, we don't upCase them since the JSON fields are not upcased
   def visit(tableColumn: Column) {
-    val colName = "%s__%s".format(tableColumn.getTable, tableColumn.getColumnName)
+    val colName = if (tableColumn.getTable.getName == null) tableColumn.getColumnName else "%s__%s".format(tableColumn.getTable, tableColumn.getColumnName)
     selectItems.append(colName)
     tableColumn.setTable(emptyTable)
     tableColumn.setColumnName(colName)
