@@ -8,8 +8,8 @@ trait IndexStorage {
 
   def query(projection: Projection, nodeIds: Set[Int], sql: String) : List[Record]
 
-  def add(projection: Projection, nodeIds: Set[Int], datum: Record) : String
-  def addAll(projection: Projection, nodeIds: Set[Int], data: List[Record]) : List[String]
+  def add(projection: Projection, nodeIds: Set[Int], record: Record) : String
+  def addAll(projection: Projection, nodeIdMap: Map[Int, Set[String]], recordMap: Map[String, Record]) : List[String]
 
   def remove(nodeIds: Set[Int], id: String)
 }

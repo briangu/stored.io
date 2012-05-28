@@ -10,7 +10,6 @@ import collection.immutable._
 import java.io.StringReader
 import net.sf.jsqlparser.parser.CCJSqlParserManager
 import net.sf.jsqlparser.statement.select.Select
-import collection.mutable.{ListBuffer, SynchronizedMap}
 import sql.SqlRequestProcessor
 
 
@@ -20,74 +19,9 @@ object Node {
 
   var node: Node = null
 
-  def getNodeIds(projection: Projection, hashCoords: Map[String, List[BigInt]]) : Set[Int] = {
-    if (hashCoords == null || hashCoords.size == 0) return projection.allNodeIds
-
-    val intersection = hashCoords.keySet.intersect(projection.getFields)
-    if (intersection.size == 0) return projection.allNodeIds
-
-    // fill each project field with all appropriate values
-    val fieldMap = new collection.mutable.HashMap[String, List[BigInt]]
-    projection.getFields.foreach{ key =>
-      if (hashCoords.contains(key)) {
-        fieldMap.put(key, hashCoords.get(key).get)
-      } else {
-        fieldMap.put(key, genFieldValues(projection.getFieldValue(key).bitWeight))
-      }
-    }
-
-    val fieldList = projection.getFields.toList
-
-    // generate all possible nodeIds using the fieldMap
-    val nodeIds = new collection.mutable.HashSet[Int]
-    genNodeIds(fieldList, projection, fieldMap.toMap, nodeIds, 0)
-    nodeIds.toSet
-  }
-
-  def genFieldValues(bitwidth: Int) : List[BigInt] = {
-    val ids = new collection.mutable.HashSet[BigInt]
-    for (x <- 0 until math.pow(2, bitwidth).toInt) ids.add(BigInt.apply(x))
-    ids.toList
-  }
-
-  def genNodeIds(fields: List[String], proj: Projection, fieldMap: Map[String, List[BigInt]], nodeIds: collection.mutable.HashSet[Int], nodeIdPrefix: Int) {
-    if (fields.size == 0) {
-      nodeIds.add(nodeIdPrefix)
-      return
-    }
-
-    val bitWidth = proj.getFieldValue(fields(0)).bitWeight
-    val shifted = BigInt.apply(nodeIdPrefix << bitWidth)
-    val mask = (math.pow(2, bitWidth).toInt - 1)
-
-    fieldMap.get(fields(0)).get.foreach{ bitVal =>
-      val nodeId = shifted | (bitVal & mask)
-      genNodeIds(fields.slice(1, fields.size), proj, fieldMap, nodeIds, nodeId.toInt)
-    }
-  }
-
-  // TODO: support multiple values for data map
-  def getProjectionCoords(projection: Projection, data: Map[String, AnyRef]) : Map[String, List[BigInt]] = {
-    val result = new collection.mutable.HashMap[String, List[BigInt]] with SynchronizedMap[String, List[BigInt]]
-    data.keySet.par.foreach{ key =>
-      if (data.contains(key)) {
-        val dataVal = data.get(key).get
-
-        if (dataVal.isInstanceOf[Long]) {
-          result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[Long])))
-        } else if (dataVal.isInstanceOf[java.lang.Integer]) {
-          result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[java.lang.Integer])))
-        } else if (dataVal.isInstanceOf[String]) {
-          result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[String])))
-        } else if (dataVal.isInstanceOf[Double]) {
-          result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[Double])))
-        } else {
-          // println("not hashing col: " + key)
-          // skip fields we can't hash
-        }
-      }
-    }
-    result.toMap
+  def indexRecords(projection: Projection, is: IndexStorage, nodeIdMap: Map[Int, Set[String]], recordMap: Map[String, Record]) {
+    val ids = is.addAll(projection, nodeIdMap, recordMap)
+    println(ids.mkString(","))
   }
 
   def indexRecord(projection: Projection, is: IndexStorage, nodeIds: Set[Int], record: Record) = {
@@ -128,26 +62,13 @@ object Node {
   }
 
   def applySelectItems(selectedItems: List[String], records: List[Record]) : List[Record] = {
-    if (selectedItems == null || selectedItems.size == 0 || selectedItems(0).equals("*")) {
-      return records
-    }
+    if (selectedItems == null || selectedItems.size == 0 || selectedItems(0).equals("*")) return records
 
-    val newRecords = new ListBuffer[Record]
-    records.foreach( record => {
+    records.map { record =>
       val dst = new JSONObject()
-      selectedItems.foreach( rawPath => {
-        copyJsonObjectPath(record.rawData, dst, rawPath.split("__").toList)
-        newRecords.append(new Record(record.id, null, dst))
-      })
-    })
-    newRecords.toList
-  }
-
-  def jsonResponse(args: AnyRef*) : JsonResponse = {
-    if (args.length % 2 != 0) throw new RuntimeException("expecting key value pairs")
-    val obj = new JSONObject
-    (0 until args.length by 2).foreach(i => obj.put(args(i).toString(), args(i+1)))
-    new JsonResponse(obj)
+      selectedItems.foreach(rawPath => copyJsonObjectPath(record.rawData, dst, rawPath.split("__").toList))
+      new Record(record.id, null, dst)
+    }
   }
 
   def getRequestedProjection(args: java.util.Map[String, String]) : Projection = {
@@ -158,14 +79,17 @@ object Node {
     }
   }
 
-  def setFromJsonArray(rawJsonArray : String) : Set[Int] = {
-    val ja = new JSONArray(rawJsonArray)
-    val list = new ListBuffer[Int]
-    (0 until ja.length()).foreach(i => list.append(ja.getInt(i)))
-    list.toSet
+  def getJsonRecords(args: java.util.Map[String, String]) : JSONArray = {
+    if (args.containsKey("records")) {
+      new JSONArray(args.get("records"))
+    } else {
+      val arr = new JSONArray()
+      arr.put(new JSONObject(args.get("record")))
+      arr
+    }
   }
 
-  // 8080 src/main/resources/db src/main/resources/nodes.json src/main/resources/projections.json
+  // 7080 src/main/resources/db src/main/resources/nodes.json src/main/resources/projections.json
   def main(args: Array[String]) {
 
     val localPort = args(0).toInt
@@ -174,45 +98,60 @@ object Node {
     val projectionsConfigFile = args(3)
 
     println("booting...")
-
     initialize("http://localhost:%d".format(localPort), storagePath, nodesConfigFile, projectionsConfigFile)
-
     println("ready!")
 
+    // transform map into flat namespace map
+    // perform hyperspace hashing on named fields using proj reference
+    // store Record into table
+    //  ensure all flattened field names exist using db proj reference
+    //
+    // determine which shard node to use from hash coords
+    //  in the localhost case, we hold all shards on one Node
+    //  in the multi-node case, we'd have to forward the request to teh appropriate node based on hashCoords
+    //
     NestServer.run(localPort, new RestServer {
       def addRoutes {
 
-        // transform map into flat namespace map
-        // perform hyperspace hashing on named fields using proj reference
-        // store Record into table
-        //  ensure all flattened field names exist using db proj reference
-        //
-        // determine which shard node to use from hash coords
-        //  in the localhost case, we hold all shards on one Node
-        //  in the multi-node case, we'd have to forward the request to teh appropriate node based on hashCoords
-        //
         post("/records", new RouteHandler {
           def exec(args: java.util.Map[String, String]): RouteResponse = {
-            if (!args.containsKey("record")) {
+            if (!args.containsKey("record") && !args.containsKey("records")) {
               return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
             }
 
-            val record = Record.create(args.get("record"))
             val projection = getRequestedProjection(args)
+            val jsonRecords = getJsonRecords(args)
 
-            val intersection = record.colMap.keySet.intersect(projection.getFields)
-            if (intersection.size != projection.getFields.size) {
-              return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+            val recordMap : Map[String, Record] = Map() ++ (0 until jsonRecords.length).par.map { i =>
+              val record = Record.create(jsonRecords.getJSONObject(i))
+              val intersection = record.colMap.keySet.intersect(projection.getFields)
+              if (intersection.size != projection.getFields.size) {
+                return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+              }
+              (record.id, record)
             }
 
-            val coords = getProjectionCoords(projection, record.colMap)
-            val nodeIds = if (args.containsKey("nodeIds")) setFromJsonArray(args.get("nodeIds")) else getNodeIds(projection, coords)
+            val nodeIdMap = new collection.mutable.HashMap[Int, Set[String]]
+            recordMap.values.foreach{ record =>
+              projection.getNodeIds(record).foreach{ id =>
+                if (nodeIdMap.contains(id)) {
+                  nodeIdMap.get(id).get ++ record.id
+                } else {
+                  nodeIdMap.put(id, Set[String](record.id))
+                }
+              }
+            }
 
-            val nodeMap = projection.getNodeHosts(nodeIds)
-            nodeMap.keySet.par.foreach{node => indexRecord(projection, node, nodeMap.get(node).get, record)}
+            val nodeStoreMap = projection.getNodeStores(nodeIdMap.keySet.toSet)
+            nodeStoreMap.keySet.foreach{ node =>
+              val storeNodeIds = nodeStoreMap.get(node).get
+              val storeNodeIdMap = nodeIdMap.filterKeys(storeNodeIds)
+              val storeNodeRecordIds = storeNodeIdMap.values.foldLeft(Set[String]())(_ union _)
+              val storeRecords = recordMap.filterKeys(storeNodeRecordIds)
+              indexRecords(projection, node, storeNodeIdMap.toMap, storeRecords.toMap)
+            }
 
-            println("indexed " + record.id)
-            jsonResponse("id", record.id)
+            JsonUtil.jsonResponse("id", JsonUtil.toJsonArray(recordMap.keySet.toList))
           }
         })
 
@@ -220,14 +159,20 @@ object Node {
           def exec(args: java.util.Map[String, String]): RouteResponse = {
             if (!args.containsKey("sql")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
 
-            val sql = args.get("sql").replace(".", "__") // TODO correct using jsqlparser visitor
+            val sql = args.get("sql")
             val (projectionName, nodeSql, selectedItems, whereItems) = processSqlRequest(sql)
             if (!node.projections.hasProjection(projectionName)) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
             val projection = node.projections.getProjection(projectionName)
-            val nodeIds = if (args.containsKey("nodeIds")) setFromJsonArray(args.get("nodeIds")) else getNodeIds(projection, whereItems)
-            val nodeMap = projection.getNodeHosts(nodeIds)
+            val nodeIds = if (args.containsKey("nodeIds")) JsonUtil.intSetFromJsonArray(args.get("nodeIds")) else projection.getNodeIds(whereItems)
+            val nodeMap = projection.getNodeStores(nodeIds)
 
-            val results : List[Record] = if (nodeMap.keySet.size == 1) {
+            println("nodeSql: " + nodeSql)
+
+            // TODO: we need to apply a final-sql that is generated from the original sql in some cases
+            //       when COUNT is specified in select
+            //       possibly when group-by is specified
+            //       the processSqlRequest should produce a finalSql, which may == nodeSql
+            val results : List[Record] = if (nodeMap.keySet.size == 1 /* && nodeSql != finalSql */) {
               queryNode(projection, projection.getNodeIndexStorage(nodeIds.toList(0)), nodeIds, nodeSql)
             } else {
               var mergedResults : List[Record] = null
@@ -245,9 +190,7 @@ object Node {
             }
             val filteredResults = applySelectItems(selectedItems, results)
 
-            val elements = new JSONArray()
-            filteredResults.foreach{ record => { elements.put( record.rawData) }}
-            jsonResponse("elements", elements)
+            JsonUtil.jsonResponse("elements", JsonUtil.toJsonArray(filteredResults, { record: Record => record.rawData }))
           }
         })
     }})

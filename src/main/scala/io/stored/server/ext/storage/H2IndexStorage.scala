@@ -14,7 +14,7 @@ import io.stored.server.common.{Projection, Record, IndexStorage}
 object H2IndexStorage {
   private val log: Logger = Logger.getLogger(classOf[H2IndexStorage])
 
-  def createInMemoryDb : IndexStorage = {
+  def createInMemoryDb : H2IndexStorage = {
     val storage = new H2IndexStorage(null)
     storage.init()
     storage
@@ -129,10 +129,6 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     }
   }
 
-  private def filterColMap(colMap: Map[String, AnyRef]) : Map[String, AnyRef] = {
-    colMap
-  }
-
   private def createIndex(db: Connection, tableName: String, colName: String) {
     var statement: PreparedStatement = null
     try {
@@ -151,7 +147,9 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
   }
 
   private def createColumn(projection: Projection, db: Connection, tableName: String, colName: String, colVal: AnyRef) : Boolean = {
-    if (colName.length > 32) return false
+    if (colName.length > 32) {
+      return false
+    }
 
     _tableColumns.synchronized {
       if (!_tableColumns.contains(colName)) {
@@ -199,20 +197,11 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
   private def add(projection: Projection, nodeIds: Set[Int], db: Connection, tableName:String, record: Record) : String = {
     var statement: PreparedStatement = null
     try {
-      val colMap = filterColMap(record.colMap)
-      var cols = colMap.keySet
-      if (cols.size == 0) throw new IllegalArgumentException("filtered colMap has no data to index")
-
-      val removeCols = new HashSet[String] with SynchronizedSet[String]
-      cols.foreach{ colName => {
-        if (!_tableColumns.contains(colName)) {
-          if (!createColumn(projection, db, tableName, colName, colMap.get(colName).get)) {
-            removeCols.add(colName)
-          }
-        }
-      }}
-
-      cols = cols.filter(!removeCols.contains(_))
+      val colMap = record.colMap.filter{ (col: (String, AnyRef)) =>
+        (_tableColumns.contains(col._1) || createColumn(projection, db, tableName, col._1, record.colMap.get(col._1).get))
+      }
+      if (colMap.size == 0) throw new IllegalArgumentException("filtered colMap has no data to index")
+      val cols = colMap.keySet
 
       val sql = "MERGE INTO %s (HASH,RAWDATA,%s) VALUES (?,?,%s);".format(
         tableName,
@@ -224,16 +213,17 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
       bind(statement, 2, record.rawData.toString)
 
       var idx = 3
-      cols.foreach{ colName => {
+      cols.foreach{ colName =>
         bind(statement, idx, colMap.get(colName).get)
         idx += 1
-      }}
+      }
 
       statement.execute
       record.id
     }
     catch {
       case e: Exception => {
+        e.printStackTrace()
         H2IndexStorage.log.error(e)
         null
       }
@@ -281,6 +271,41 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     try {
       db = getDbConnection
       add(projection, nodeIds, db, _tableName, datum)
+    }
+    catch {
+      case e: JSONException => {
+        H2IndexStorage.log.error(e)
+        null
+      }
+      case e: SQLException => {
+        H2IndexStorage.log.error(e)
+        null
+      }
+    }
+    finally {
+      SqlUtil.SafeClose(db)
+    }
+  }
+
+  def addAll(projection: Projection, nodeIdMap: Map[Int, Set[String]], recordMap: Map[String, Record]) : List[String] = {
+    if (recordMap == null) return null
+
+    var db: Connection = null
+    try {
+      db = getDbConnection
+      db.setAutoCommit(false)
+
+      recordMap.values.foreach{ record =>
+        if (record.colMap == null) {
+          add(projection, null, db,_tableName, Record.create(record.id, record.rawData))
+        } else {
+          add(projection, null, db,_tableName, record)
+        }
+      }
+
+      db.commit
+
+      recordMap.keySet.toList
     }
     catch {
       case e: JSONException => {
