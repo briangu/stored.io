@@ -2,10 +2,10 @@ package io.stored.server
 
 import _root_.io.viper.core.server.router._
 import common._
+import ext.storage.{H2ProjectionStorageRouter, H2IndexStorage}
 import io.viper.common.{NestServer, RestServer}
 import org.jboss.netty.handler.codec.http.HttpResponseStatus
 import org.json.{JSONArray, JSONObject}
-import io.stored.server.ext.storage.H2IndexStorage
 import collection.immutable._
 import java.io.StringReader
 import net.sf.jsqlparser.parser.CCJSqlParserManager

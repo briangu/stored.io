@@ -172,7 +172,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
 
           println("adding colname: " + colName + " of type " + colType)
 
-          val sql = "ALTER TABLE %s ADD %s %s".format(tableName, colName, colType)
+          val sql = "ALTER TABLE %s ADD %s %s NULL".format(tableName, colName, colType)
 
           statement = db.prepareStatement(sql)
           statement.execute
@@ -353,7 +353,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     }
   }
 
-  def remove(nodeIds: Set[Int], id: String) {
+  def remove(projection: Projection, nodeIds: Set[Int], id: String) {
     var db: Connection = null
     try {
       db = getDbConnection
