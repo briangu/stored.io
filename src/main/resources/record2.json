@@ -1,0 +1,17 @@
+record={
+  "color": "blue",
+  "year": "1996",
+  "model": "mustang",
+  "manufacturer": "ford",
+  "mileage": 75000,
+  "field1": val1,
+  "field2": val1,
+  "seat": {
+    "material": "leather",
+    "style": "bucket",
+    "safety": {
+      "rating": 5,
+      "beltstyle": "5-point"
+    }
+  }
+}

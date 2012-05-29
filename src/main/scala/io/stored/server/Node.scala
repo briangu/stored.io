@@ -2,7 +2,7 @@ package io.stored.server
 
 import _root_.io.viper.core.server.router._
 import common._
-import ext.storage.{H2ProjectionStorageRouter, H2IndexStorage}
+import ext.storage.H2IndexStorage
 import io.viper.common.{NestServer, RestServer}
 import org.jboss.netty.handler.codec.http.HttpResponseStatus
 import org.json.{JSONArray, JSONObject}
@@ -21,11 +21,12 @@ object Node {
 
   def indexRecords(projection: Projection, is: IndexStorage, nodeIdMap: Map[Int, Set[String]], recordMap: Map[String, Record]) {
     val ids = is.addAll(projection, nodeIdMap, recordMap)
-    println(ids.mkString(","))
+    println("indexed: " + ids.mkString(","))
   }
 
   def indexRecord(projection: Projection, is: IndexStorage, nodeIds: Set[Int], record: Record) = {
-    is.add(projection, nodeIds, record)
+    val id = is.add(projection, nodeIds, record)
+    println("indexed: " + id)
   }
 
   def initialize(localhost: String, storagePath: String, nodesConfigFile: String, projectionsConfigFile: String) {
