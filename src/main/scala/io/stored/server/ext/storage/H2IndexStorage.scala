@@ -11,6 +11,9 @@ import collection.mutable.{ListBuffer, SynchronizedSet, HashSet}
 import io.stored.server.common.{Projection, Record, IndexStorage}
 
 
+/***
+ * TODO: preallocate columns and create an allocation table that can be loaded at boot time
+ */
 object H2IndexStorage {
   private val log: Logger = Logger.getLogger(classOf[H2IndexStorage])
 
