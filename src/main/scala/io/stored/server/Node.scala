@@ -60,19 +60,24 @@ object Node {
       }
     } else {
       val dstChild = new JSONObject()
-      dst.put(key, dstChild)
-      copyJsonObjectPath(src.getJSONObject(key), dstChild, path.slice(1, path.size))
+      if (src.has(key)) {
+        dst.put(key, dstChild)
+        copyJsonObjectPath(src.getJSONObject(key), dstChild, path.slice(1, path.size))
+      }
     }
   }
 
   def applySelectItems(selectedItems: List[String], records: List[Record]) : List[Record] = {
     if (selectedItems == null || selectedItems.size == 0 || selectedItems(0).equals("*")) return records
 
-    records.map { record =>
+    val filteredRecords = records.map { record =>
       val dst = new JSONObject()
       selectedItems.foreach(rawPath => copyJsonObjectPath(record.rawData, dst, rawPath.split("__").toList))
       new Record(record.id, null, dst)
     }
+
+    // TODO: can this be rolled into previous map operation?
+    filteredRecords.filter(_.rawData.length() > 0)
   }
 
   def getRequestedProjection(args: java.util.Map[String, String]) : Projection = {
