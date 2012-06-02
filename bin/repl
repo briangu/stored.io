@@ -1,0 +1,63 @@
+#!/usr/bin/env python
+
+"""
+
+ Rudimentary command line frontend for Brian's stored.io
+
+"""
+
+import cmd
+import restkit
+import simplejson
+import sys
+import urllib
+
+# TODO: make this configurable, or speciable on command line
+SERVER_URL = 'http://localhost:7080/'
+
+class BSql(cmd.Cmd):
+
+  SELECT_COMPLETIONS = ['from', 'where']
+  prompt = 'SQL: '
+  ruler = '-'
+
+  def do_select(self, command):
+    """ Run SQL select statement """
+    client = restkit.resource.Resource(SERVER_URL, timeout=10)
+    payload = 'sql=' + urllib.quote('select ' + command)
+    try:
+      response = client.post(path='records/queries', payload=payload)
+      json = simplejson.load(response.body_stream())
+      print simplejson.dumps(json, indent='  ')
+    except restkit.errors.ResourceNotFound as e:
+      print 'URL not found: %s' % e.response.final_url
+    except restkit.errors.RequestError as e:
+      print "Error when accessing %s: %s" % (SERVER_URL, e)
+    except restkit.errors.RequestFailed as e:
+      print "Request failed: %s (URL=%s POST='%s')" % (e.status_int, e.response.final_url, payload)
+
+  def complete_select(self, text, line, begidx, endidx):
+    """ Auto-complete help for select statements """
+    if not text:
+      completions = self.SELECT_COMPLETIONS[:]
+    else:
+      completions = [f for f in self.SELECT_COMPLETIONS if f.startswith(text)]
+    return completions
+
+  def do_exit(self, command):
+    """ Exit interpreter """
+    print "bye"
+    return True
+
+  def emptyline(self):
+    pass
+
+
+if __name__ == '__main__':
+  if len(sys.argv) > 1:
+    BSql().onecmd(' '.join(sys.argv[1:]))
+  else:
+    try:
+      BSql().cmdloop()
+    except KeyboardInterrupt:
+      print "\nbye"

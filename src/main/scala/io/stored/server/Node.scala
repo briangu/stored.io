@@ -8,9 +8,10 @@ import org.jboss.netty.handler.codec.http.HttpResponseStatus
 import org.json.{JSONArray, JSONObject}
 import collection.immutable._
 import java.io.StringReader
-import net.sf.jsqlparser.parser.CCJSqlParserManager
 import net.sf.jsqlparser.statement.select.Select
 import sql.SqlRequestProcessor
+import net.sf.jsqlparser.parser.{ParseException, CCJSqlParserManager}
+import net.sf.jsqlparser.JSQLParserException
 
 
 class Node(val localNode : IndexStorage, val projections: ProjectionsConfig) {}
@@ -54,7 +55,9 @@ object Node {
 
     val key = path(0)
     if (path.size == 1) {
-      dst.put(key, src.get(key))
+      if (src.has(key)) {
+        dst.put(key, src.get(key))
+      }
     } else {
       val dstChild = new JSONObject()
       dst.put(key, dstChild)
@@ -158,40 +161,44 @@ object Node {
 
         post("/records/queries", new RouteHandler {
           def exec(args: java.util.Map[String, String]): RouteResponse = {
-            if (!args.containsKey("sql")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+            try {
+              if (!args.containsKey("sql")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
 
-            val sql = args.get("sql")
-            val (projectionName, nodeSql, selectedItems, whereItems) = processSqlRequest(sql)
-            if (!node.projections.hasProjection(projectionName)) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
-            val projection = node.projections.getProjection(projectionName)
-            val nodeIds = if (args.containsKey("nodeIds")) JsonUtil.intSetFromJsonArray(args.get("nodeIds")) else projection.getNodeIds(whereItems)
-            val nodeMap = projection.getNodeStores(nodeIds)
+              val sql = args.get("sql")
+              val (projectionName, nodeSql, selectedItems, whereItems) = processSqlRequest(sql)
+              if (!node.projections.hasProjection(projectionName)) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+              val projection = node.projections.getProjection(projectionName)
+              val nodeIds = if (args.containsKey("nodeIds")) JsonUtil.intSetFromJsonArray(args.get("nodeIds")) else projection.getNodeIds(whereItems)
+              val nodeMap = projection.getNodeStores(nodeIds)
 
-            println("nodeSql: " + nodeSql)
+              println("nodeSql: " + nodeSql)
 
-            // TODO: we need to apply a final-sql that is generated from the original sql in some cases
-            //       when COUNT is specified in select
-            //       possibly when group-by is specified
-            //       the processSqlRequest should produce a finalSql, which may == nodeSql
-            val results : List[Record] = if (nodeMap.keySet.size == 1 /* && nodeSql != finalSql */) {
-              queryNode(projection, projection.getNodeIndexStorage(nodeIds.toList(0)), nodeIds, nodeSql)
-            } else {
-              var mergedResults : List[Record] = null
-              val mergeDb = H2IndexStorage.createInMemoryDb
-              try {
-                nodeMap.keySet.par.foreach{node =>
-                  val nodeMapIds = nodeMap.get(node).get
-                  mergeDb.addAll(projection, nodeMapIds, queryNode(projection, node, nodeMapIds, nodeSql))
+              // TODO: we need to apply a final-sql that is generated from the original sql in some cases
+              //       when COUNT is specified in select
+              //       possibly when group-by is specified
+              //       the processSqlRequest should produce a finalSql, which may == nodeSql
+              val results : List[Record] = if (nodeMap.keySet.size == 1 /* && nodeSql != finalSql */) {
+                queryNode(projection, projection.getNodeIndexStorage(nodeIds.toList(0)), nodeIds, nodeSql)
+              } else {
+                var mergedResults : List[Record] = null
+                val mergeDb = H2IndexStorage.createInMemoryDb
+                try {
+                  nodeMap.keySet.par.foreach{node =>
+                    val nodeMapIds = nodeMap.get(node).get
+                    mergeDb.addAll(projection, nodeMapIds, queryNode(projection, node, nodeMapIds, nodeSql))
+                  }
+                  mergedResults = mergeDb.query(projection, nodeIds, nodeSql) // TODO: null may be better for nodeIds
+                } finally {
+                  mergeDb.shutdown()
                 }
-                mergedResults = mergeDb.query(projection, nodeIds, nodeSql) // TODO: null may be better for nodeIds
-              } finally {
-                mergeDb.shutdown()
+                mergedResults
               }
-              mergedResults
-            }
-            val filteredResults = applySelectItems(selectedItems, results)
+              val filteredResults = applySelectItems(selectedItems, results)
 
-            JsonUtil.jsonResponse("elements", JsonUtil.toJsonArray(filteredResults, { record: Record => record.rawData }))
+              JsonUtil.jsonResponse("elements", JsonUtil.toJsonArray(filteredResults, { record: Record => record.rawData }))
+            } catch {
+              case e: JSQLParserException => return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+            }
           }
         })
     }})
