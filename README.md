@@ -21,8 +21,30 @@ The general design is inspired by several well-known and lesser-known systems:
 
 Some of the principles align very well with OLAP
 
-Example
-=======
+Quick Start
+===========
+
+Start server with defaults @ 8080:
+
+    $ ./bin/launch.sh 8080
+
+Load some test data:    
+
+    $ ./bin/add_sample_data.sh
+
+Use the SQL repl: (Thanks Zoran!)
+
+    $ ./bin/repl
+
+Try some queries:
+
+    SQL: select color from cars
+    SQL: select seat from cars
+    SQL: select seat.material from cars where seat.safety.rating = 8
+    SQL: select user.id from tweets
+
+More Examples
+=============
 
 The basic developer experience consists simply of posting JSON objects into the system.
 The system "flattens" the JSON creating key-paths for all contents and makes each unique key path a column in the db.
