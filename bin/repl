@@ -13,7 +13,7 @@ import sys
 import urllib
 
 # TODO: make this configurable, or speciable on command line
-SERVER_URL = 'http://localhost:7080/'
+SERVER_URL = 'http://localhost:8080/'
 
 class BSql(cmd.Cmd):
 
