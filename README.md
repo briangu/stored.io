@@ -32,7 +32,7 @@ Load some test data:
 
     $ ./bin/add_sample_data.sh
 
-Use the SQL repl: (Thanks Zoran!)
+Use the python SQL repl: (Thanks Zoran!) [may require "easy_install restkit"]
 
     $ ./bin/repl
 
