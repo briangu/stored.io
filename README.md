@@ -27,6 +27,11 @@ Some of the principles align very well with OLAP
 Quick Start
 ===========
 
+Get the code:
+
+    $ git clone git://github.com/briangu/stored.io.git
+    $ cd stored.io
+
 Start server with defaults @ 8080:
 
     $ ./bin/launch.sh 8080
