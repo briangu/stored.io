@@ -1,5 +1,5 @@
-Summary
-=======
+Overview
+========
 
 Stored.io (store-d) is distributed SQL and schema-less JSON object store that operates as a layer on top of arbitrary, standard, SQL systems.
 
