@@ -9,6 +9,7 @@ import java.sql._
 import io.stored.common.SqlUtil
 import collection.mutable.{ListBuffer, SynchronizedSet, HashSet}
 import io.stored.server.common.{Projection, Record, IndexStorage}
+import java.util.UUID
 
 
 /***
@@ -18,7 +19,7 @@ object H2IndexStorage {
   private val log: Logger = Logger.getLogger(classOf[H2IndexStorage])
 
   def createInMemoryDb : H2IndexStorage = {
-    val storage = new H2IndexStorage(null)
+    val storage = new H2IndexStorage("mem:%s".format(UUID.randomUUID().toString.replace("-","")))
     storage.init()
     storage
   }
@@ -38,7 +39,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
   private val _tableColumns = new HashSet[String] with SynchronizedSet[String]
 
   private def getDbFile: String = configRoot + File.separator + "index"
-  private def createConnectionString: String = "jdbc:h2:%s".format(if (isMemoryDb) "mem:" else getDbFile)
+  private def createConnectionString: String = "jdbc:h2:%s".format(if (isMemoryDb) configRoot else getDbFile)
   private def getDbConnection: Connection = _cp.getConnection
 
   private def getReadOnlyDbConnection: Connection = {
@@ -47,7 +48,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     conn
   }
 
-  def isMemoryDb = configRoot == null
+  def isMemoryDb = configRoot.startsWith("mem:")
 
   def init() {
     Class.forName("org.h2.Driver")

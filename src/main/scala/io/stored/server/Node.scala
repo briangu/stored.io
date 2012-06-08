@@ -10,7 +10,7 @@ import collection.immutable._
 import java.io.StringReader
 import net.sf.jsqlparser.statement.select.Select
 import sql.SqlRequestProcessor
-import net.sf.jsqlparser.parser.{ParseException, CCJSqlParserManager}
+import net.sf.jsqlparser.parser.CCJSqlParserManager
 import net.sf.jsqlparser.JSQLParserException
 
 
@@ -22,12 +22,12 @@ object Node {
 
   def indexRecords(projection: Projection, is: IndexStorage, nodeIdMap: Map[Int, Set[String]], recordMap: Map[String, Record]) {
     val ids = is.addAll(projection, nodeIdMap, recordMap)
-    println("indexed: " + ids.mkString(","))
+    if (ids != null) println("indexed: " + ids.mkString(","))
   }
 
   def indexRecord(projection: Projection, is: IndexStorage, nodeIds: Set[Int], record: Record) = {
     val id = is.add(projection, nodeIds, record)
-    println("indexed: " + id)
+    if (id != null) println("indexed: " + id)
   }
 
   def initialize(localhost: String, storagePath: String, nodesConfigFile: String, projectionsConfigFile: String) {
@@ -80,12 +80,16 @@ object Node {
     filteredRecords.filter(_.rawData.length() > 0)
   }
 
-  def getRequestedProjection(args: java.util.Map[String, String]) : Projection = {
+  def getRequestedProjection(args: java.util.Map[String, String], defaultProjName: String) : Projection = {
     if (args.containsKey("projection") && (node.projections.hasProjection(args.get("projection")))) {
       node.projections.getProjection(args.get("projection"))
     } else {
-      node.projections.getDefaultProjection
+      node.projections.getProjection(defaultProjName)
     }
+  }
+
+  def getRequestedProjection(args: java.util.Map[String, String]) : Projection = {
+    getRequestedProjection(args, node.projections.getDefaultProjection.name)
   }
 
   def getJsonRecords(args: java.util.Map[String, String]) : JSONArray = {
@@ -170,9 +174,9 @@ object Node {
               if (!args.containsKey("sql")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
 
               val sql = args.get("sql")
-              val (projectionName, nodeSql, selectedItems, whereItems) = processSqlRequest(sql)
-              if (!node.projections.hasProjection(projectionName)) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
-              val projection = node.projections.getProjection(projectionName)
+              val (sqlProjectionName, nodeSql, selectedItems, whereItems) = processSqlRequest(sql)
+              val projection = getRequestedProjection(args, sqlProjectionName)
+              if (projection == null) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
               val nodeIds = if (args.containsKey("nodeIds")) JsonUtil.intSetFromJsonArray(args.get("nodeIds")) else projection.getNodeIds(whereItems)
               val nodeMap = projection.getNodeStores(nodeIds)
 

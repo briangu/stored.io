@@ -1,16 +1,18 @@
 package io.stored.server.common
 
 import io.viper.core.server.router.JsonResponse
-import org.json.{JSONObject, JSONArray}
 import collection.mutable.ListBuffer
+import org.json.{JSONObject, JSONArray}
 
 object JsonUtil {
 
   def toJsonArray[A,B](list: List[A]) : JSONArray = {
-    toJsonArray(list, {x:A => x})
+    val arr = new JSONArray
+    list.foreach{x: A => arr.put(x)}
+    arr
   }
 
-  def toJsonArray[A,B](list: List[A], f: A => B) : JSONArray = {
+  def toJsonArray[A,JSONObject](list: List[A], f: A => JSONObject) : JSONArray = {
     val arr = new JSONArray
     list.foreach{x: A => arr.put(f(x))}
     arr

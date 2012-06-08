@@ -5,6 +5,7 @@ import com.ning.http.client.AsyncHttpClient
 import collection.mutable.ListBuffer
 import org.json.{JSONArray, JSONObject}
 import io.stored.server.common.{JsonUtil, Projection, Record, IndexStorage}
+import io.stored.common.CryptoUtil
 
 
 class HttpIndexStorage(host: String) extends IndexStorage
@@ -25,6 +26,7 @@ class HttpIndexStorage(host: String) extends IndexStorage
     val response = asyncHttpClient.
       preparePost("%s/records/queries".format(host))
       .addParameter("sql",sql)
+      .addParameter("projection", projection.name)
       .addParameter("nodeIds", JsonUtil.toJsonArray(nodeIds).toString)
       .execute
       .get
@@ -79,7 +81,14 @@ class HttpIndexStorage(host: String) extends IndexStorage
         val jsonResponse = new JSONObject(responseBody)
         if (jsonResponse.has("id")) {
           val arr = new JSONArray(jsonResponse.getString("id"))
-          (0 until arr.length()).map(i => arr.getString(i)).toList
+          val idSet = (0 until arr.length()).map(i => arr.getString(i)).toSet
+          if (!idSet.equals(recordMap.keySet)) {
+            println("stored records have different hashes!")
+            println("expecting: " + recordMap.keySet.mkString(","))
+            println("received: " + idSet.mkString(","))
+            throw new RuntimeException("stored records have different hashes!")
+          }
+          idSet.toList
         } else {
           null
         }

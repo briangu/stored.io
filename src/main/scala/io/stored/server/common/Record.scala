@@ -1,9 +1,8 @@
 package io.stored.server.common
 
 import collection.mutable.HashMap
-import org.json.JSONObject
 import io.stored.common.CryptoUtil
-import util.parsing.json.JSONArray
+import org.json.{JSONArray, JSONObject}
 
 
 object Record {
@@ -30,13 +29,44 @@ object Record {
             || ref.isInstanceOf[Double]
             || ref.isInstanceOf[Boolean]) {
           map.put(refPath, ref)
+        } else if (ref.equals(JSONObject.NULL)) {
+          // nothing to do
         } else {
-//          println("skipping key: " + refPath)
+          println("skipping unknown %s for key: %s".format(ref.getClass.getName, refPath))
         }
       }
     }
 
     map.toMap
+  }
+
+  def canonicalJson(data: AnyRef) : String = {
+
+    val sb = new StringBuilder
+
+    if (data.isInstanceOf[JSONObject]) {
+
+      val obj = data.asInstanceOf[JSONObject]
+      val iter = obj.keys
+      val keyMap = new HashMap[String, String]
+
+      while(iter.hasNext) {
+        val key = iter.next().asInstanceOf[String]
+        val ref = obj.get(key)
+        keyMap.put(key, canonicalJson(ref))
+      }
+
+      sb.append("{%s}".format(keyMap.keySet.toList.sorted.map(key => "\"%s\":%s".format(key, keyMap.get(key).get)).mkString(",")))
+    } else if (data.isInstanceOf[JSONArray]) {
+      val arr = data.asInstanceOf[JSONArray]
+      sb.append("[%s]".format((0 until arr.length()).map(i => canonicalJson(arr.get(i)).mkString(","))))
+    } else if (data.isInstanceOf[String]) {
+      sb.append("\"%s\"".format(data.toString))
+    } else {
+      sb.append(data.toString)
+    }
+
+    sb.toString
   }
 
   def create(id: String, rawData: String) : Record = {
@@ -45,17 +75,10 @@ object Record {
     new Record(id, colMap, jsonData)
   }
 
-  def create(rawData: String) : Record = {
-    val id = CryptoUtil.computeHash(rawData.getBytes("UTF-8"))
-    val jsonData = new JSONObject(rawData)
-    val colMap = flatten(jsonData)
-    new Record(id, colMap, jsonData)
-  }
-
   def create(jsonData: JSONObject) : Record = {
-    val hash = CryptoUtil.computeHash(jsonData.toString.getBytes("UTF-8"))
+    val id = CryptoUtil.computeHash(canonicalJson(jsonData).getBytes("UTF-8"))
     val keyMap = flatten(jsonData)
-    new Record(hash, keyMap, jsonData)
+    new Record(id, keyMap, jsonData)
   }
 
   def create(id: String, jsonData: JSONObject) : Record = {
