@@ -1,0 +1,32 @@
+records=[{
+  "color": "red",
+  "year": "1995",
+  "model": "mustang",
+  "manufacturer": "ford",
+  "mileage": 75000,
+  "field1": val1,
+  "field2": val1,
+  "seat": {
+    "material": "leather",
+    "style": "bucket",
+    "safety": {
+      "rating": 5,
+      "beltstyle": "5-point"
+    }
+  }
+},
+{
+  "color": "blue",
+  "year": "2006",
+  "model": "prius",
+  "manufacturer": "toyota",
+  "mileage": 5000,
+  "seat": {
+    "material": "fabric",
+    "style": "standard",
+    "safety": {
+      "rating": 8,
+      "beltstyle": "shoulder"
+    }
+  }
+}]
