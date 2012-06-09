@@ -31,7 +31,6 @@ object Node {
   }
 
   def initialize(localhost: String, storagePath: String, nodesConfigFile: String, projectionsConfigFile: String) {
-    H2IndexStorage.init
     val localNode = H2IndexStorage.create(storagePath)
     val projections = ProjectionsConfig.create(localhost, localNode, nodesConfigFile, projectionsConfigFile)
     node = new Node(localNode, projections)

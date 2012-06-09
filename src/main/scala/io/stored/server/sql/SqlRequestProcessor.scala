@@ -32,7 +32,7 @@ class SqlRequestProcessor extends SelectVisitor with ExpressionVisitor
       val valueExtractor = new ExpressionValueExtractor
       p1.getRightExpression.accept(valueExtractor)
       if (valueExtractor.expressionValue != null) {
-        whereItems.put(colExtractor.columnName, List(valueExtractor.expressionValue))
+        whereItems.put(colExtractor.columnName.toUpperCase, List(valueExtractor.expressionValue))
       }
     }
   }
