@@ -87,4 +87,7 @@ object Record {
   }
 }
 
-class Record(val id: String, val colMap: Map[String, AnyRef], val rawData: JSONObject) {}
+class Record(val id: String, val colMap: Map[String, AnyRef], val rawData: JSONObject) {
+  override def hashCode : Int = id.hashCode
+  override def equals(other: Any) : Boolean = id.equals(other)
+}

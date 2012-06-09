@@ -190,14 +190,16 @@ object Node {
               val results : List[Record] = if (nodeMap.keySet.size == 1 /* && nodeSql != finalSql */) {
                 queryNode(projection, projection.getNodeIndexStorage(nodeIds.toList(0)), nodeIds, nodeSql)
               } else {
+                // TODO: this is pretty horrific...and is a consequence of the H2 db having some null pointer issues
+                //       when accessed from multiple threads
+                // TODO: only do this when we have some post processing predicate: ORDER BY, LIMIT, GROUP BY, COUNT, etc.
                 var mergedResults : List[Record] = null
                 val mergeDb = H2IndexStorage.createInMemoryDb
                 try {
-                  nodeMap.keySet.foreach{node =>
-                    val nodeMapIds = nodeMap.get(node).get
-                    mergeDb.addAll(projection, nodeMapIds, queryNode(projection, node, nodeMapIds, nodeSql))
+                  nodeMap.keySet.map{node =>
+                    mergeDb.addAll(projection, null, queryNode(projection, node, nodeMap.get(node).get, nodeSql))
                   }
-                  mergedResults = mergeDb.query(projection, nodeIds, nodeSql) // TODO: null may be better for nodeIds
+                  mergedResults = mergeDb.query(projection, nodeIds, nodeSql)
                 } finally {
                   mergeDb.shutdown()
                 }
