@@ -31,6 +31,7 @@ object Node {
   }
 
   def initialize(localhost: String, storagePath: String, nodesConfigFile: String, projectionsConfigFile: String) {
+    H2IndexStorage.init
     val localNode = H2IndexStorage.create(storagePath)
     val projections = ProjectionsConfig.create(localhost, localNode, nodesConfigFile, projectionsConfigFile)
     node = new Node(localNode, projections)
@@ -192,7 +193,7 @@ object Node {
                 var mergedResults : List[Record] = null
                 val mergeDb = H2IndexStorage.createInMemoryDb
                 try {
-                  nodeMap.keySet.par.foreach{node =>
+                  nodeMap.keySet.foreach{node =>
                     val nodeMapIds = nodeMap.get(node).get
                     mergeDb.addAll(projection, nodeMapIds, queryNode(projection, node, nodeMapIds, nodeSql))
                   }
