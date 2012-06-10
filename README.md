@@ -24,6 +24,8 @@ The general design is inspired by several well-known and lesser-known systems:
 
 Some of the principles align very well with OLAP
 
+stored.io is powered by viper.io.
+
 Quick Start
 ===========
 
