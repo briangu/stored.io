@@ -6,7 +6,7 @@ import operators.arithmetic._
 import operators.conditional._
 import operators.relational._
 import java.util.Arrays
-import collection.mutable.{HashMap, ListBuffer}
+import collection.mutable.HashMap
 import net.sf.jsqlparser.statement.select._
 import net.sf.jsqlparser.schema.{Table, Column}
 
@@ -23,6 +23,12 @@ class SqlRequestProcessor extends SelectVisitor with ExpressionVisitor
     p1.getRightExpression.accept(this)
   }
 
+  def visit(p1: OrExpression)
+  {
+    p1.getLeftExpression.accept(this)
+    p1.getRightExpression.accept(this)
+  }
+
   def visit(p1: EqualsTo)
   {
     val colExtractor = new WhereColumnNameExtractor
@@ -32,7 +38,12 @@ class SqlRequestProcessor extends SelectVisitor with ExpressionVisitor
       val valueExtractor = new ExpressionValueExtractor
       p1.getRightExpression.accept(valueExtractor)
       if (valueExtractor.expressionValue != null) {
-        whereItems.put(colExtractor.columnName.toUpperCase, List(valueExtractor.expressionValue))
+        val key = colExtractor.columnName.toUpperCase
+        if (whereItems.contains(key)) {
+          whereItems.put(key, whereItems.get(key).get ++ List(valueExtractor.expressionValue))
+        } else {
+          whereItems.put(key, List(valueExtractor.expressionValue))
+        }
       }
     }
   }
@@ -115,6 +126,5 @@ class SqlRequestProcessor extends SelectVisitor with ExpressionVisitor
   def visit(p1: BitwiseOr) {}
   def visit(p1: BitwiseXor) {}
   def visit(p1: Union) {}
-  def visit(p1: OrExpression) {}
   def visit(p1: Between) {}
 }

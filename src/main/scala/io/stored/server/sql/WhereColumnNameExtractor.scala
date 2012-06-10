@@ -30,7 +30,10 @@ class WhereColumnNameExtractor extends ExpressionVisitor {
   def visit(p1: Multiplication) {}
   def visit(p1: Subtraction) {}
   def visit(p1: AndExpression) {}
-  def visit(p1: OrExpression) {}
+  def visit(p1: OrExpression) {
+    p1.getLeftExpression.accept(this)
+    p1.getRightExpression.accept(this)
+  }
   def visit(p1: Between) {}
   def visit(p1: EqualsTo) {}
   def visit(p1: GreaterThan) {}

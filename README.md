@@ -48,6 +48,8 @@ Try some queries:
 
     SQL: select color from cars
     SQL: select seat from cars
+    SQL: select seat from cars where color = 'red' or color = 'blue'
+    SQL: select seat.safety.rating from cars where color = 'red' or color = 'blue' and seat.material = 'leather'
     SQL: select seat.material from cars where seat.safety.rating = 8
     SQL: select user.id from tweets
 
