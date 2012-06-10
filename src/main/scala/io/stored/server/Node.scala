@@ -6,12 +6,10 @@ import ext.storage.H2IndexStorage
 import io.viper.common.{NestServer, RestServer}
 import org.jboss.netty.handler.codec.http.HttpResponseStatus
 import org.json.{JSONArray, JSONObject}
-import collection.immutable._
-import java.io.StringReader
-import net.sf.jsqlparser.statement.select.Select
-import sql.SqlRequestProcessor
-import net.sf.jsqlparser.parser.CCJSqlParserManager
 import net.sf.jsqlparser.JSQLParserException
+import collection.immutable._
+import sql.QueryInfo
+import collection.mutable.SynchronizedSet
 
 
 class Node(val localNode : IndexStorage, val projections: ProjectionsConfig) {}
@@ -38,16 +36,6 @@ object Node {
 
   def queryNode(projection: Projection, is: IndexStorage, nodeIds: Set[Int], sql: String) : List[Record] = {
     is.query(projection, nodeIds, sql)
-  }
-
-  def processSqlRequest(sql: String) : (String, String, List[String], Map[String, List[BigInt]]) = {
-    val pm = new CCJSqlParserManager
-    val statement = pm.parse(new StringReader(sql))
-    if (!statement.isInstanceOf[Select]) throw new IllegalArgumentException("sql is not a select statement")
-    val selectStatement = statement.asInstanceOf[Select]
-    val sp = new SqlRequestProcessor
-    selectStatement.getSelectBody.accept(sp)
-    (sp.projectionName, statement.toString, sp.selectItems, sp.whereItems.toMap)
   }
 
   def copyJsonObjectPath(src: JSONObject, dst: JSONObject, path: List[String]) {
@@ -173,45 +161,62 @@ object Node {
             try {
               if (!args.containsKey("sql")) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
 
-              val sql = args.get("sql")
-              val (sqlProjectionName, nodeSql, selectedItems, whereItems) = processSqlRequest(sql)
-              val projection = getRequestedProjection(args, sqlProjectionName)
-              if (projection == null) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
-              val nodeIds = if (args.containsKey("nodeIds")) JsonUtil.intSetFromJsonArray(args.get("nodeIds")) else projection.getNodeIds(whereItems)
-              val nodeMap = projection.getNodeStores(nodeIds)
-
-              println("nodeSql: " + nodeSql)
-
-              // TODO: we need to apply a final-sql that is generated from the original sql in some cases
-              //       when COUNT is specified in select
-              //       possibly when group-by is specified
-              //       the processSqlRequest should produce a finalSql, which may == nodeSql
-              val results : List[Record] = if (nodeMap.keySet.size == 1 /* && nodeSql != finalSql */) {
-                queryNode(projection, projection.getNodeIndexStorage(nodeIds.toList(0)), nodeIds, nodeSql)
+              val results = if (args.containsKey("nodeIds")) {
+                val nodeSql = args.get("sql")
+                val projection = getRequestedProjection(args)
+                if (projection == null) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+                val nodeIds = JsonUtil.intSetFromJsonArray(args.get("nodeIds"))
+                val nodeMap = Map(node.localNode -> nodeIds)
+                val queryInfo = new QueryInfo(projection.name, nodeSql, nodeSql, List(), Map())
+                doQuery(queryInfo, projection, nodeMap, nodeIds)
               } else {
-                // TODO: this is pretty horrific...and is a consequence of the H2 db having some null pointer issues
-                //       when accessed from multiple threads
-                // TODO: only do this when we have some post processing predicate: ORDER BY, LIMIT, GROUP BY, COUNT, etc.
-                var mergedResults : List[Record] = null
-                val mergeDb = H2IndexStorage.createInMemoryDb
-                try {
-                  nodeMap.keySet.map{node =>
-                    mergeDb.addAll(projection, null, queryNode(projection, node, nodeMap.get(node).get, nodeSql))
-                  }
-                  mergedResults = mergeDb.query(projection, nodeIds, nodeSql)
-                } finally {
-                  mergeDb.shutdown()
-                }
-                mergedResults
+                val queryInfo = QueryInfo.create(args.get("sql"))
+                val projection = getRequestedProjection(args, queryInfo.projectionName)
+                if (projection == null) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+                val nodeIds = projection.getNodeIds(queryInfo.whereItems)
+                val nodeMap = projection.getNodeStores(nodeIds)
+                doQuery(queryInfo, projection, nodeMap, nodeIds)
               }
-              val filteredResults = applySelectItems(selectedItems, results)
 
-              JsonUtil.jsonResponse("elements", JsonUtil.toJsonArray(filteredResults, { record: Record => record.rawData }))
+              JsonUtil.jsonResponse("elements", JsonUtil.toJsonArray(results, { record: Record => record.rawData }))
             } catch {
               case e: JSQLParserException => return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
             }
           }
         })
+
+        def doQuery(queryInfo: QueryInfo, projection: Projection, nodeMap: Map[IndexStorage, Set[Int]], nodeIds: Set[Int]) : List[Record] = {
+  //        println("nodeSql: " + queryInfo.nodeSql)
+
+          // TODO: we need to apply a final-sql that is generated from the original sql in some cases
+          //       when COUNT is specified in select
+          //       possibly when group-by is specified
+          //       the processSqlRequest should produce a finalSql, which may == nodeSql
+          val results = if (nodeMap.keySet.size == 1 && queryInfo.nodeSql.equals(queryInfo.finalSql)) {
+            queryNode(projection, projection.getNodeIndexStorage(nodeIds.toList(0)), nodeIds, queryInfo.nodeSql)
+          } else {
+            // TODO: this is pretty horrific...and is a consequence of the H2 db having some null pointer issues
+            //       when accessed from multiple threads
+            val set = new scala.collection.mutable.HashSet[Record] with SynchronizedSet[Record]
+            nodeMap.keySet.par.foreach{node =>
+              queryNode(projection, node, nodeMap.get(node).get, queryInfo.nodeSql).foreach(set.add)
+            }
+            if (queryInfo.nodeSql.equals(queryInfo.finalSql)) {
+              set.toList
+            } else {
+              // TODO: only do this when we have some post processing predicate: ORDER BY, LIMIT, GROUP BY, COUNT, etc.
+              val mergeDb = H2IndexStorage.createInMemoryDb
+              try {
+                mergeDb.addAll(projection, null, set.toList)
+                mergeDb.query(projection, nodeIds, queryInfo.finalSql)
+              } finally {
+                mergeDb.shutdown()
+              }
+            }
+          }
+
+          applySelectItems(queryInfo.selectedItems, results)
+        }
     }})
   }
 }
