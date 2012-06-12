@@ -28,7 +28,7 @@ class BSql(cmd.Cmd):
     try:
       response = client.post(path='records/queries', payload=payload)
       json = simplejson.load(response.body_stream())
-      print simplejson.dumps(json, indent='  ')
+      print simplejson.dumps(json, indent=2)
     except restkit.errors.ResourceNotFound as e:
       print 'URL not found: %s' % e.response.final_url
     except restkit.errors.RequestError as e:
