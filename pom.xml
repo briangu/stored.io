@@ -56,7 +56,7 @@
     <dependency>
       <groupId>io.viper</groupId>
       <artifactId>io.viper.core</artifactId>
-      <version>0.1.1-SNAPSHOT</version>
+      <version>0.1.1</version>
     </dependency>
     <dependency>
       <groupId>log4j</groupId>
