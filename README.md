@@ -5,11 +5,13 @@ Stored.io (store-d) lets you easily combine standard SQL servers to create a dis
 
 Putting developer convenience first, stored.io makes it easy to think of data in JSON and queries in standard SQL.  Rather than reinventing the wheel, stored.io leverages mature SQL systems to provide the backing stores.  Stored.io essentially is a smart, distributed computing wrapper.
 
-To make it scale, it is a distributed system that uses hyperspace hashing (projections) and hypercube addressing to map nodes to regions of the hyperspace.  The layering of hyper spaces and cubes provides a good deal of flexibility to manage skew.  Since projections are really useful, they may both be added dynamically and used dynamically (as the SQL from clause).  Additionally, the hypercube design allows for straight foward replication strategies.
+Scaling is done by combining hyperspace hashing (see http://hyperdex.org) as "projections" and hypercube addressing (see OLAP and Connection Machine) to map nodes to regions of the hyperspace.  The layering provides a good deal of flexibility to manage skew.  Additionally, the hypercube design allows for straight foward replication strategies.
+
+Projections are the foundation of bothing indexing and accessing data.  Data may be indexed under multiple projections and accessed via multiple projections.  Projections may also be added and referenced dynamically.
 
 From a developer's perspective, the system is schema-less because they never have to create them.  This is in the spirit of MongoDB.  The system also supports native SQL on the added JSON Objects.  When an object is added, the object is flattened automatically producing columns for each key-value path.
 
-From an operational perspective, it is a distribute system with a heavy bias towards read-oriented system of generally immutable data.  For example, indexing of Twitter tweets, news, rss, articles, stocks, etc.
+Initially, stored.io has a heavy bias towards read-oriented system of generally immutable data.  For example, indexing of Twitter tweets, news, rss, articles, stocks, etc.
 
 The general design is inspired by several well-known and lesser-known systems:
 
