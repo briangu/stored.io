@@ -56,14 +56,12 @@ The core developer experience consists simply of posting JSON objects and queryi
 Start a single node stored.io instance:
 
     $ cd stored.io
+    $ ./bin/launch.sh 8080
 
-    [build]
+OR build:
+
     $ mvn clean install
     $ java -jar target/io.stored-0.0.1-SNAPSHOT-jar-with-dependencies.jar 8080 db/8080 src/main/resources/nodes.json src/main/resources/projections.json
-
-    OR
-
-    $ ./bin/launch.sh 8080
 
 When JSON is added, the system "flattens" the JSON creating path-specs for all fields and makes each a column in the underlying SQL db.  Subsequently, the developer can use any path-spec in a SQL statement.  If a column is also in the specified projection, upon creating the column it is also made an index.
 
