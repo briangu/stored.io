@@ -15,14 +15,14 @@ Initially, stored.io has a heavy bias towards read-oriented system of generally 
 
 The general design is inspired by several well-known and lesser-known systems:
 
-    HyperDex.org
-    Cassandra
-    MongoDB
-    CM-2 (Connection Machine 2)
+    [HyperDex](http://hyperdex.org)
+    [Cassandra](http://cassandra.apache.org/)
+    [MongoDB](http://www.mongodb.org/)
+    [CM-2 (Connection Machine 2)](http://en.wikipedia.org/wiki/CM-2)
 
-Some of the principles align very well with OLAP
+Some of the stored.io principles align very well with [OLAP](http://en.wikipedia.org/wiki/Online_analytical_processing)
 
-stored.io is powered by viper.io.
+stored.io is powered by [viper.io](https://github.com/briangu/viper.io).
 
 Quick Start
 ===========
@@ -53,12 +53,12 @@ Try some queries:
     SQL: select seat.material from cars where seat.safety.rating = 8
     SQL: select user.id from tweets
 
-More Examples
-=============
+Detailed Examples
+=================
 
 The basic developer experience consists simply of posting JSON objects into the system.
-The system "flattens" the JSON creating key-paths for all contents and makes each unique key path a column in the db.
-Subsequently, the developer can use any key-path in a SQL statement.
+The system "flattens" the JSON creating path-specs for all contents and makes each unique key path a column in the db.
+Subsequently, the developer can use any path-spec in a SQL statement.
 
 Object paths are selectable via the standard SQL select an yield a portion of the original JSON object.
 
@@ -110,15 +110,15 @@ Produces:
 
 
 Usage
-========
+=====
 
 Start the service by:
 
-  java -jar target/io.stored-0.0.1-SNAPSHOT-jar-with-dependencies.jar src/main/resources/config.json src/main/resources/db
+  java -jar target/io.stored-0.0.1-SNAPSHOT-jar-with-dependencies.jar src/main/resources/config.json db/8080
 
 The following example shows how to add data and query it back out.  Notice, no table schemas were defined!
 
-create a file called record.json
+create a file called record.json (@src/main/resources/record.json):
 
     record={
       "color": "red",
@@ -170,6 +170,124 @@ yielding:
 Everytime you add new data to the system, columns will automatically be created for you.
 However, only the columns specified in the hyperspace schema in config.json will be used to improve performance.
 
+REST API
+========
+
+Store (INSERT)
+--------------
+
+REQUEST:
+    URL format:  http://<host>:<port>/records
+    HTTP method: POST
+    POST body keys:
+
+        projection=<projection name>
+        [record|records]=
+
+RESPONSE:
+    id=[<record id>]
+
+The specified projection name must refer to a previously registered projection.  Additionally, the record(s) being INSERTed must have at least one field which is present in the projection.  That is, the intersection between the record columns and the projection must be non-empty.
+
+For inserting a single item, use the record key:
+
+    record={
+      "color": "red",
+      "year": "1995",
+      "model": "mustang",
+      "manufacturer": "ford",
+      "mileage": 75000,
+      "field1": val1,
+      "field2": val1,
+      "seat": {
+        "material": "leather",
+        "style": "bucket",
+        "safety": {
+          "rating": 5,
+          "beltstyle": "5-point"
+        }
+      }
+    }
+
+For doing a batch insert, use the records key:
+
+    records=[{
+      "color": "red",
+      "year": "1995",
+      "model": "mustang",
+      "manufacturer": "ford",
+      "mileage": 75000,
+      "seat": {
+        "material": "leather",
+        "style": "bucket",
+        "safety": {
+          "rating": 5,
+          "beltstyle": "5-point"
+        }
+      }
+    },
+    {
+      "color": "blue",
+      "year": "2006",
+      "model": "prius",
+      "manufacturer": "toyota",
+      "mileage": 5000,
+      "seat": {
+        "material": "fabric",
+        "style": "standard",
+        "safety": {
+          "rating": 8,
+          "beltstyle": "shoulder"
+        }
+      }
+    }]
+
+
+
+Query (SELECT)
+--------------
+
+#REQUEST:
+    URL format:  http://<host>:<port>/records/queries
+    HTTP method: POST
+    POST body:
+        sql=<sql statement>
+
+#RESPONSE:
+    records=[<record>]
+
+The specified SQL statement may be whichever SQL is supported by the underlying SQL engine that stored.io is configured to use.  However, there are a few constraints regarding the clause references:
+
+NOTE: At this time, only the SELECT predicate is supported.
+
+##SELECT
+
+    Fields specified in the SELECT clause will extracted from the JSON records.
+    COUNT will be supported.
+
+##FROM
+
+    The from clause MUST refer to a previously registered projection.
+
+##WHERE
+
+    Fields specified in the WHERE clause MUST refer to the fields indexed in previously INSERTed records.
+
+##Examples:
+
+    select * from cars
+    select color from cars
+    select seat from cars
+    select seat from cars where color = 'red' or color = 'blue'
+    select seat.safety.rating from cars where color = 'red' or color = 'blue' and seat.material = 'leather'
+    select seat.material from cars where seat.safety.rating = 8
+    select user.id from tweets
+
+#TABLES and JOINS - NOT (YET?) SUPPORTED:
+
+In order to get something, you have to give up something.  Since stored.io is schema-less, at this time, stored.io does not really have a notion of TABLE.  Undoubtedly, it's possible to wrangle some notion of table if desired.  For example, depending upon how stored.io is configured, it is possible for teach projection to be stored in it's own table.  However, at this time, since tables are not supported, JOINS will not work.
+
+
 Projections
 ===========
 
@@ -200,8 +318,8 @@ Projections
       ]
     }
 
-Internals
-=========
+Hyperspace Hashing
+==================
 
 This section will contain detailed info on how the distributed nature of store-d works.
 
@@ -229,52 +347,13 @@ This section will contain detailed info on how the distributed nature of store-d
       "field3": val1
     }
 
+Todo/Roadmap
+============
 
-Schema Config
-=============
+Hadoop map/reduce-like functionality that can be distributed on each processing node.
+Stream queries
+Faceted search
 
-    {
-      "dimensions": 12,
-      "fields": {
-        "color": 3,
-        "year": 3,
-        "model": 2,
-        "manufacturer": 2,
-        "mileage": 2
-      }
-    }
+Use zookeeper to configure cluster
 
 
-Possibly fancier config:
-
-    {
-      "fields": {
-        "color": {
-          "alg": "md5",
-          "weight": 3
-        },
-        "year": {
-          "alg": "md5",
-          "weight": 3
-        },
-        "model": {
-          "alg": "md5",
-          "weight": 2
-        },
-        "manufacturer": {
-          "alg": "md5",
-          "weight": 2
-        },
-        "mileage": {
-          "alg": "md5",
-          "weight": 2
-        }
-      }
-    }
-
-Todo
-====
-
-machine map
-  localhost
-  via zookeepr

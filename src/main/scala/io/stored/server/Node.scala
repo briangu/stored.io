@@ -178,7 +178,7 @@ object Node {
                 doQuery(queryInfo, projection, nodeMap, nodeIds)
               }
 
-              JsonUtil.jsonResponse("elements", JsonUtil.toJsonArray(results, { record: Record => record.rawData }))
+              JsonUtil.jsonResponse("records", JsonUtil.toJsonArray(results, { record: Record => record.rawData }))
             } catch {
               case e: JSQLParserException => return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
             }

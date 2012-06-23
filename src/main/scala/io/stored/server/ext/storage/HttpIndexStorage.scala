@@ -33,8 +33,8 @@ class HttpIndexStorage(host: String) extends IndexStorage
     val responseBody = response.getResponseBody
     if (responseBody.startsWith("{")) {
       val jsonResponse = new JSONObject(responseBody)
-      if (jsonResponse.has("elements")) {
-        val elements = jsonResponse.getJSONArray("elements")
+      if (jsonResponse.has("records")) {
+        val elements = jsonResponse.getJSONArray("records")
 
         val results = new ListBuffer[Record]
         (0 until elements.length()).foreach(i => results.append(Record.create(elements.getJSONObject(i))))
