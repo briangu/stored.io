@@ -11,18 +11,9 @@ Scaling is done by combining hyperspace hashing (see [hyperdex](http://hyperdex.
 
 Projections are the foundation of bothing indexing and accessing data.  Data may be indexed under multiple projections and accessed via multiple projections.  Projections may also be added and referenced dynamically.
 
-From a developer's perspective, the system is schema-less because they never have to create them.  This is in the spirit of MongoDB.  The system also supports native SQL on the added JSON Objects.  When an object is added, the object is flattened automatically producing columns for each key-value path.
+From a developer's perspective, the system is schema-less because they never have to create them.  This is in the spirit of [MongoDB](http://www.mongodb.org/) and [Cassandra](http://cassandra.apache.org/).  The system also supports native SQL on the added JSON Objects.  When an object is added, the object is flattened automatically producing columns for each key-value path.
 
 Initially, stored.io has a heavy bias towards read-oriented system of generally immutable data.  For example, indexing of Twitter tweets, news, rss, articles, stocks, etc.
-
-The general design is inspired by several well-known and lesser-known systems:
-
-[HyperDex](http://hyperdex.org)
-[Cassandra](http://cassandra.apache.org/)
-[MongoDB](http://www.mongodb.org/)
-[CM-2 (Connection Machine 2)](http://en.wikipedia.org/wiki/CM-2)
-
-Some of the stored.io principles align very well with [OLAP](http://en.wikipedia.org/wiki/Online_analytical_processing)
 
 stored.io is powered by [viper.io](https://github.com/briangu/viper.io).
 
