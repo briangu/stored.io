@@ -5,7 +5,7 @@ Stored.io (store-d) lets you easily combine standard SQL servers to create a dis
 
 Putting developer convenience first, stored.io makes it easy to think of data in JSON and queries in standard SQL.  Rather than reinventing the wheel, stored.io leverages mature SQL systems to provide the backing stores.  Stored.io essentially is a smart, distributed computing wrapper.
 
-Scaling is done by combining hyperspace hashing (see http://hyperdex.org) as "projections" and hypercube addressing (see OLAP and Connection Machine) to map nodes to regions of the hyperspace.  The layering provides a good deal of flexibility to manage skew.  Additionally, the hypercube design allows for straight foward replication strategies.
+Scaling is done by combining hyperspace hashing (see [hyperdex](http://hyperdex.org)) as "projections" and hypercube addressing (see [OLAP](http://en.wikipedia.org/wiki/Online_analytical_processing) and [Connection Machine](http://en.wikipedia.org/wiki/CM-2)) to map nodes to regions of the hyperspace.  The layering provides a good deal of flexibility to manage skew.  Additionally, the hypercube design allows for straight foward replication strategies.
 
 Projections are the foundation of bothing indexing and accessing data.  Data may be indexed under multiple projections and accessed via multiple projections.  Projections may also be added and referenced dynamically.
 
