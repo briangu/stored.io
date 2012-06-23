@@ -116,7 +116,8 @@ Usage
 
 Start the service by:
 
-  java -jar target/io.stored-0.0.1-SNAPSHOT-jar-with-dependencies.jar src/main/resources/config.json db/8080
+    $ cd stored.io
+    $ java -jar target/io.stored-0.0.1-SNAPSHOT-jar-with-dependencies.jar src/main/resources/nodes.json db/8080
 
 The following example shows how to add data and query it back out.  Notice, no table schemas were defined!
 
