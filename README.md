@@ -176,7 +176,7 @@ REST API
 Store (INSERT)
 --------------
 
-REQUEST:
+##REQUEST:
     URL format:  http://<host>:<port>/records
     HTTP method: POST
     POST body keys:
@@ -184,7 +184,7 @@ REQUEST:
         projection=<projection name>
         [record|records]=
 
-RESPONSE:
+##RESPONSE:
     id=[<record id>]
 
 The specified projection name must refer to a previously registered projection.  Additionally, the record(s) being INSERTed must have at least one field which is present in the projection.  That is, the intersection between the record columns and the projection must be non-empty.
@@ -247,33 +247,33 @@ For doing a batch insert, use the records key:
 Query (SELECT)
 --------------
 
-#REQUEST:
+##REQUEST:
     URL format:  http://<host>:<port>/records/queries
     HTTP method: POST
     POST body:
         sql=<sql statement>
 
-#RESPONSE:
+##RESPONSE:
     records=[<record>]
 
 The specified SQL statement may be whichever SQL is supported by the underlying SQL engine that stored.io is configured to use.  However, there are a few constraints regarding the clause references:
 
 NOTE: At this time, only the SELECT predicate is supported.
 
-##SELECT
+###SELECT
 
     Fields specified in the SELECT clause will extracted from the JSON records.
     COUNT will be supported.
 
-##FROM
+###FROM
 
     The from clause MUST refer to a previously registered projection.
 
-##WHERE
+###WHERE
 
     Fields specified in the WHERE clause MUST refer to the fields indexed in previously INSERTed records.
 
-##Examples:
+###Examples:
 
     select * from cars
     select color from cars
@@ -283,7 +283,7 @@ NOTE: At this time, only the SELECT predicate is supported.
     select seat.material from cars where seat.safety.rating = 8
     select user.id from tweets
 
-#TABLES and JOINS - NOT (YET?) SUPPORTED:
+##TABLES and JOINS - NOT (YET?) SUPPORTED:
 
 In order to get something, you have to give up something.  Since stored.io is schema-less, at this time, stored.io does not really have a notion of TABLE.  Undoubtedly, it's possible to wrangle some notion of table if desired.  For example, depending upon how stored.io is configured, it is possible for teach projection to be stored in it's own table.  However, at this time, since tables are not supported, JOINS will not work.
 
