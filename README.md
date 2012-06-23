@@ -348,10 +348,17 @@ Adding a new adapter to support a new SQL system is easy.
       def remove(projection: Projection, nodeIds: Set[Int], id: String)
     }
 
+At the moment, two adapters are included: H2IndexStorage and HttpIndexStorage.
+
+The H2IndexStorage is the default SQL storage implementation that uses [H2Database](http://www.h2database.com/).
+
+HttpIndexStorage is a proxy that's used internally to forward requests to other stored.io nodes.
 
 Todo/Roadmap
 ============
 
+JDBC driver
+SQLite adapter
 Hadoop map/reduce-like functionality that can be distributed on each processing node.
 Stream queries
 Faceted search
