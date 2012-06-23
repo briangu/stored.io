@@ -9,7 +9,7 @@ Putting developer convenience first, stored.io makes it easy to think of data in
 
 Scaling is done by combining hyperspace hashing (see [hyperdex](http://hyperdex.org)) as "projections" and hypercube addressing (see [OLAP](http://en.wikipedia.org/wiki/Online_analytical_processing) and [Connection Machine](http://en.wikipedia.org/wiki/CM-2)) to map nodes and machines to regions of the hyperspace.  The layering provides a good deal of flexibility to manage skew.  Additionally, the hypercube design allows for straight foward replication strategies.
 
-Projections are the foundation of bothing indexing and accessing data.  Data may be indexed under multiple projections and accessed via multiple projections.  Projections may also be added and referenced dynamically.
+Projections are the foundation for both indexing and accessing data.  The fundamental function of a projection is to intelligently scope scatter-gather requests to an optimal node/machine subset.  Data may be indexed under multiple projections and accessed via multiple projections.  Projections may also be added and referenced dynamically.
 
 From a developer's perspective, the system is schema-less because they never have to create them.  This is in the spirit of [MongoDB](http://www.mongodb.org/) and [Cassandra](http://cassandra.apache.org/).  The system also supports native SQL on the added JSON Objects.  When an object is added, the object is flattened automatically producing columns for each key-value path.
 
