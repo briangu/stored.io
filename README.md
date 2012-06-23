@@ -329,6 +329,26 @@ This section will contain detailed info on how the distributed nature of store-d
       "field3": val1
     }
 
+Adding new SQL Adapters
+=======================
+
+Adding a new adapter to support a new SQL system is easy.
+
+    trait IndexStorage {
+      def init()
+      def shutdown()
+
+      def purge()
+
+      def query(projection: Projection, nodeIds: Set[Int], sql: String) : List[Record]
+
+      def add(projection: Projection, nodeIds: Set[Int], record: Record) : String
+      def addAll(projection: Projection, nodeIdMap: Map[Int, Set[String]], recordMap: Map[String, Record]) : List[String]
+
+      def remove(projection: Projection, nodeIds: Set[Int], id: String)
+    }
+
+
 Todo/Roadmap
 ============
 
