@@ -17,10 +17,10 @@ Initially, stored.io has a heavy bias towards read-oriented system of generally 
 
 The general design is inspired by several well-known and lesser-known systems:
 
-    [HyperDex](http://hyperdex.org)
-    [Cassandra](http://cassandra.apache.org/)
-    [MongoDB](http://www.mongodb.org/)
-    [CM-2 (Connection Machine 2)](http://en.wikipedia.org/wiki/CM-2)
+[HyperDex](http://hyperdex.org)
+[Cassandra](http://cassandra.apache.org/)
+[MongoDB](http://www.mongodb.org/)
+[CM-2 (Connection Machine 2)](http://en.wikipedia.org/wiki/CM-2)
 
 Some of the stored.io principles align very well with [OLAP](http://en.wikipedia.org/wiki/Online_analytical_processing)
 
