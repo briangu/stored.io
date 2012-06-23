@@ -60,6 +60,7 @@ Start a single node stored.io instance:
 
 OR build:
 
+    $ ./bin/mvn-install.sh
     $ mvn clean install
     $ java -jar target/io.stored-0.0.1-SNAPSHOT-jar-with-dependencies.jar 8080 db/8080 src/main/resources/nodes.json src/main/resources/projections.json
 

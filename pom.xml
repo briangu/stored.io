@@ -42,8 +42,6 @@
       <groupId>net.sf.jsqlparser</groupId>
       <artifactId>net.sf.jsqlparser</artifactId>
       <version>0.7.0</version>
-      <scope>system</scope>
-      <systemPath>${project.basedir}/lib/jsqlparser-0.7.0.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>com.h2database</groupId>
