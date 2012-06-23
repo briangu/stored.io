@@ -17,6 +17,8 @@ Initially, stored.io has a heavy bias towards read-oriented system of generally 
 
 stored.io is powered by [viper.io](https://github.com/briangu/viper.io).
 
+A JDBC driver is under development.
+
 Quick Start
 ===========
 
@@ -46,73 +48,19 @@ Try some queries:
     SQL: select seat.material from cars where seat.safety.rating = 8
     SQL: select user.id from tweets
 
-Detailed Examples
-=================
+Detailed Example
+================
 
-The basic developer experience consists simply of posting JSON objects into the system.
-The system "flattens" the JSON creating path-specs for all contents and makes each unique key path a column in the db.
-Subsequently, the developer can use any path-spec in a SQL statement.
+The core developer experience consists simply of posting JSON objects and querying them back out.  This section goes into details about what's actually happening to enable this simple developer experience.
 
-Object paths are selectable via the standard SQL select an yield a portion of the original JSON object.
-
-For example, given:
-
-    {
-      "color": "red",
-      "year": "1995",
-      "model": "mustang",
-      "manufacturer": "ford",
-      "mileage": 75000,
-      "field1": val1,
-      "field2": val1,
-      "seat": {
-        "material": "leather",
-        "style": "bucket",
-        "safety": {
-          "rating": 5,
-          "beltstyle": "5-point"
-        }
-      }
-    }
-
-The following columns are created:
-
-    color
-    year
-    model
-    manufacturer
-    mileage
-    field1
-    field2
-    seat.material
-    seat.style
-    seat.safety.rating
-    seat.safety.beltstyle
-
-Standard SQL is supported such that (cars is the hyperspace hashing projection we are using):
-
-    select seat.material from cars where seat.safety.rating = 5
-
-Produces:
-
-    {
-      "seat": {
-        "material": "leather"
-      }
-    }
-
-
-Usage
-=====
-
-Start the service by:
+Start a single node stored.io instance:
 
     $ cd stored.io
-    $ java -jar target/io.stored-0.0.1-SNAPSHOT-jar-with-dependencies.jar src/main/resources/nodes.json db/8080
+    $ java -jar target/io.stored-0.0.1-SNAPSHOT-jar-with-dependencies.jar 8080 db/8080 src/main/resources/nodes.json src/main/resources/projections.json
 
-The following example shows how to add data and query it back out.  Notice, no table schemas were defined!
+When JSON is added, the system "flattens" the JSON creating path-specs for all fields and makes each a column in the underlying SQL db.  Subsequently, the developer can use any path-spec in a SQL statement.  If a column is also in the specified projection, upon creating the column it is also made an index.
 
-create a file called record.json (@src/main/resources/record.json):
+To see this in action, create a file called record.json (@src/main/resources/record.json):
 
     record={
       "color": "red",
@@ -132,11 +80,61 @@ create a file called record.json (@src/main/resources/record.json):
       }
     }
 
-Add data to the store:
+Add it to the store using the 'cars' projection:
 
-    curl -d@record.json http://localhost:8080/records
+    curl -d@src/main/resources/record.json -dprojection='cars' http://localhost:8080/records
 
-Query data from the store using plain-old-sql:
+Internally, for this JSON object the following columns are created in the SQL db:
+
+    COLOR
+    YEAR
+    MODEL
+    MANUFACTURER
+    MILEAGE
+    FIELD1
+    FIELD2
+    SEAT__MATERIAL
+    SEAT__STYLE
+    SEAT__SAFETY___RATING
+    SEAT__SAFETY___BELTSTYLE
+
+The cars projection uses the following columns as hyperspace dimensions so these columns will also be made indexes in the SQL db.
+
+    COLOR
+    YEAR
+    MODEL
+    MANUFACTURER
+
+For convenience, the new SQL db columns can be referenced via SQL by:
+
+    color
+    year
+    model
+    manufacturer
+    mileage
+    field1
+    field2
+    seat.material
+    seat.style
+    seat.safety.rating
+    seat.safety.beltstyle
+
+Notice, no table schemas were explicitly defined!
+
+Standard SQL is supported such that (cars is the hyperspace hashing projection we are using):
+
+    curl --data-urlencode "sql=select seat.material from cars where seat.safety.rating = 5" http://localhost:8080/records/queries
+
+Produces:
+
+    {
+      "seat": {
+        "material": "leather"
+      }
+    }
+
+
+Try some other queries:
 
     curl --data-urlencode "sql=select * from cars where seat.material = 'leather'" http://localhost:8080/records/queries
 
@@ -147,22 +145,6 @@ or
 or SELECT a portion of the object:
 
     curl --data-urlencode "sql=select seat.material from cars where seat.safety.rating = 5" http://localhost:8080/records/queries
-
-yielding:
-
-    {
-      "elements": [
-        {
-          "seat": {
-              "material": "leather"
-          }
-        }
-      ]
-    }
-
-
-Everytime you add new data to the system, columns will automatically be created for you.
-However, only the columns specified in the hyperspace schema in config.json will be used to improve performance.
 
 REST API
 ========
@@ -279,7 +261,7 @@ NOTE: At this time, only the SELECT predicate is supported.
 
 ##TABLES and JOINS - NOT (YET?) SUPPORTED:
 
-In order to get something, you have to give up something.  Since stored.io is schema-less, at this time, stored.io does not really have a notion of TABLE.  Undoubtedly, it's possible to wrangle some notion of table if desired.  For example, depending upon how stored.io is configured, it is possible for teach projection to be stored in it's own table.  However, at this time, since tables are not supported, JOINS will not work.
+In order to get something, you have to give up something.  Since stored.io is schema-less, at this time, stored.io does not really have a notion of TABLE.  Undoubtedly, it's possible to wrangle some notion of table if desired.  For example, depending upon how stored.io is configured, it is possible for each projection to be stored in it's own table.  However, at this time, since tables are not supported, JOINS will not work.
 
 
 Projections
@@ -347,6 +329,7 @@ Todo/Roadmap
 Hadoop map/reduce-like functionality that can be distributed on each processing node.
 Stream queries
 Faceted search
+Training mode, where the system recommends a projection based on query history.
 
 Use zookeeper to configure cluster
 
