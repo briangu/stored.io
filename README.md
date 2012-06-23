@@ -1,7 +1,11 @@
 Overview
 ========
 
-Stored.io (store-d) is distributed SQL and schema-less JSON object store that operates as a layer on top of arbitrary, standard, SQL systems.
+Stored.io (store-d) lets you easily combine standard SQL servers to create a distributed schema-less JSON store that uses native SQL.
+
+Putting developer convenience first, stored.io makes it easy to think of data in JSON and queries in standard SQL.  
+Rather than reinventing the wheel, stored.io leverages mature SQL systems to provide the backing stores.  
+Stored.io essentially is a smart, distributed computing wrapper.
 
 To make it scale, it is a distributed system that uses hyperspace hashing (projections) and hypercube addressing to map nodes to regions of the hyperspace.
 The layering of hyper spaces and cubes provides a good deal of flexibility to manage skew.
