@@ -30,6 +30,15 @@
         "metadata.container.name": 2,
         "mountPoint": 2
       }
+    },
+    {
+      "name": "cloudcmd",
+      "dimensions": 12,
+      "fields": {
+        "fileext": 4,
+        "path": 2,
+        "filename": 6
+      }
     }
   ]
 }
