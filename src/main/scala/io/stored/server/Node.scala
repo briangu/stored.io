@@ -17,10 +17,6 @@ class Node(val localNode : IndexStorage, val projections: ProjectionsConfig) {
     is.addAll(projection, nodeIdMap, recordMap)
   }
 
-  def queryNode(projection: Projection, is: IndexStorage, nodeIds: Set[Int], sql: String) : List[Record] = {
-    is.query(projection, nodeIds, sql)
-  }
-
   def copyJsonObjectPath(src: JSONObject, dst: JSONObject, path: List[String]) {
     if (path == null || path.size == 0) return
 
@@ -120,20 +116,21 @@ class Node(val localNode : IndexStorage, val projections: ProjectionsConfig) {
     //       possibly when group-by is specified
     //       the processSqlRequest should produce a finalSql, which may == nodeSql
     val results = if (nodeMap.keySet.size == 1 && queryInfo.nodeSql.equals(queryInfo.finalSql)) {
-      queryNode(projection, projection.getNodeIndexStorage(nodeIds.toList(0)), nodeIds, queryInfo.nodeSql)
+      projection.getNodeIndexStorage(nodeIds.toList(0)).query(projection, nodeIds, queryInfo.nodeSql)
     } else {
-      val set = nodeMap.keySet.par.flatMap(node => queryNode(projection, node, nodeMap.get(node).get, queryInfo.nodeSql))
+      val qr = nodeMap.keySet.par.flatMap(node => node.query(projection, nodeMap.get(node).get, queryInfo.nodeSql)).toList
+/*
       if (queryInfo.nodeSql.equals(queryInfo.finalSql)) {
-        set.toList
-      } else {
-        // TODO: do this when we have some post processing predicate: ORDER BY, LIMIT, GROUP BY, COUNT, etc.
-        val mergeDb = H2IndexStorage.createInMemoryDb
-        try {
-          mergeDb.addAll(projection, null, set.toList)
-          mergeDb.query(projection, nodeIds, queryInfo.finalSql)
-        } finally {
-          mergeDb.shutdown()
-        }
+        qr
+      } else
+*/
+      // TODO: do this when we have some post processing predicate: ORDER BY, LIMIT, GROUP BY, COUNT, etc.
+      val mergeDb = H2IndexStorage.createInMemoryDb
+      try {
+        mergeDb.addAll(projection, null, qr)
+        mergeDb.query(projection, nodeIds, queryInfo.finalSql)
+      } finally {
+        mergeDb.shutdown()
       }
     }
 

@@ -12,9 +12,6 @@ import io.stored.server.common.{Projection, Record, IndexStorage}
 import java.util.UUID
 
 
-/***
- * TODO: preallocate columns and create an allocation table that can be loaded at boot time
- */
 object H2IndexStorage {
   private val log: Logger = Logger.getLogger(classOf[H2IndexStorage])
 
@@ -219,6 +216,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
       db.setAutoCommit(false)
 
       var i = 0
+      var lastSql : String = null
 
       val ids = records.map{ orec =>
         val record = if (orec.colMap == null) { Record.create(orec.id, orec.rawData) } else { orec }
@@ -233,10 +231,18 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
           cols.mkString(","),
           List.fill(cols.size)("?").mkString(","))
 
-        statement = db.prepareStatement(sql)
+        if (lastSql == null) {
+          statement = db.prepareStatement(sql)
+        } else if (sql != lastSql) {
+          statement.executeBatch()
+          SqlUtil.SafeClose(statement)
+          statement = db.prepareStatement(sql)
+        }
+        lastSql = sql
+
         bind(statement, 1, record.id)
         bind(statement, 2, record.rawData.toString)
-        (0 until cols.size).foreach(idx => bind(statement, idx, colMap.get(cols(3 + idx)).get))
+        (0 until cols.size).foreach(idx => bind(statement, idx+3, colMap.get(cols(idx)).get))
 
         statement.addBatch
 
