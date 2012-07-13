@@ -37,7 +37,7 @@ class Node(val localNode : IndexStorage, val projections: ProjectionsConfig) {
   def applySelectItems(selectedItems: List[String], records: List[Record]) : List[Record] = {
     if (selectedItems == null || selectedItems.size == 0 || selectedItems(0).equals("*")) return records
 
-    val selSet = selectedItems.toSet
+    val selSet = selectedItems.map(_.toUpperCase).toSet
     records.flatMap { record =>
       if (record.colMap == null || record.colMap.keySet.intersect(selSet).size > 0) {
         val dst = new JSONObject()
