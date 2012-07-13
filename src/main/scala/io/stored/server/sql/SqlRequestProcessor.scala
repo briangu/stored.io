@@ -16,6 +16,7 @@ class SqlRequestProcessor extends SelectVisitor with ExpressionVisitor
   var projectionName: String = null
   var selectItems: List[String] = null
   var whereItems: HashMap[String, List[BigInt]] = new HashMap[String, List[BigInt]]
+  var postSqlRequired = false
 
   def visit(p1: AndExpression)
   {
@@ -89,6 +90,13 @@ class SqlRequestProcessor extends SelectVisitor with ExpressionVisitor
     selectItems = selectItemExtractor.selectItems.toList
 
     if (plainSelect.getWhere != null) plainSelect.getWhere.accept(this)
+
+    postSqlRequired = (
+      plainSelect.getOrderByElements != null
+      || plainSelect.getLimit != null
+      || plainSelect.getDistinct != null
+      || plainSelect.getGroupByColumnReferences != null
+      || plainSelect.getTop != null)
   }
 
   def visit(p1: NullValue) {}

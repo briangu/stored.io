@@ -119,18 +119,16 @@ class Node(val localNode : IndexStorage, val projections: ProjectionsConfig) {
       projection.getNodeIndexStorage(nodeIds.toList(0)).query(projection, nodeIds, queryInfo.nodeSql)
     } else {
       val qr = nodeMap.keySet.par.flatMap(node => node.query(projection, nodeMap.get(node).get, queryInfo.nodeSql)).toList
-/*
-      if (queryInfo.nodeSql.equals(queryInfo.finalSql)) {
+      if (queryInfo.postSqlRequired) {
+        val mergeDb = H2IndexStorage.createInMemoryDb
+        try {
+          mergeDb.addAll(projection, null, qr)
+          mergeDb.query(projection, nodeIds, queryInfo.finalSql)
+        } finally {
+          mergeDb.shutdown()
+        }
+      } else {
         qr
-      } else
-*/
-      // TODO: do this when we have some post processing predicate: ORDER BY, LIMIT, GROUP BY, COUNT, etc.
-      val mergeDb = H2IndexStorage.createInMemoryDb
-      try {
-        mergeDb.addAll(projection, null, qr)
-        mergeDb.query(projection, nodeIds, queryInfo.finalSql)
-      } finally {
-        mergeDb.shutdown()
       }
     }
 
@@ -235,7 +233,7 @@ object Node {
                 if (projection == null) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
                 val nodeIds = JsonUtil.intSetFromJsonArray(args.get("nodeIds"))
                 val nodeMap = Map(node.localNode -> nodeIds)
-                val queryInfo = new QueryInfo(projection.name, nodeSql, nodeSql, List(), Map())
+                val queryInfo = new QueryInfo(projection.name, nodeSql, nodeSql, List(), Map(), false)
                 node.doQuery(queryInfo, projection, nodeMap, nodeIds)
               } else {
                 val queryInfo = QueryInfo.create(args.get("sql"))
