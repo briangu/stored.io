@@ -2,7 +2,7 @@ package io.stored.server.common
 
 import org.json.JSONObject
 import collection.immutable._
-import collection.mutable.{LinkedHashMap, SynchronizedMap, SynchronizedSet, HashMap}
+import collection.mutable.LinkedHashMap
 import collection.mutable
 
 
