@@ -9,19 +9,12 @@ import org.json.{JSONArray, JSONObject}
 import net.sf.jsqlparser.JSQLParserException
 import collection.immutable._
 import sql.QueryInfo
-import collection.mutable.SynchronizedSet
 
 
 class Node(val localNode : IndexStorage, val projections: ProjectionsConfig) {
 
   def indexRecords(projection: Projection, is: IndexStorage, nodeIdMap: Map[Int, Set[String]], recordMap: Map[String, Record]) {
-    val ids = is.addAll(projection, nodeIdMap, recordMap)
-    if (ids != null) println("indexed: " + ids.mkString(","))
-  }
-
-  def indexRecord(projection: Projection, is: IndexStorage, nodeIds: Set[Int], record: Record) {
-    val id = is.add(projection, nodeIds, record)
-    if (id != null) println("indexed: " + id)
+    is.addAll(projection, nodeIdMap, recordMap)
   }
 
   def queryNode(projection: Projection, is: IndexStorage, nodeIds: Set[Int], sql: String) : List[Record] = {
@@ -129,16 +122,11 @@ class Node(val localNode : IndexStorage, val projections: ProjectionsConfig) {
     val results = if (nodeMap.keySet.size == 1 && queryInfo.nodeSql.equals(queryInfo.finalSql)) {
       queryNode(projection, projection.getNodeIndexStorage(nodeIds.toList(0)), nodeIds, queryInfo.nodeSql)
     } else {
-      // TODO: this is pretty horrific...and is a consequence of the H2 db having some null pointer issues
-      //       when accessed from multiple threads
-      val set = new scala.collection.mutable.HashSet[Record] with SynchronizedSet[Record]
-      nodeMap.keySet.par.foreach{node =>
-        queryNode(projection, node, nodeMap.get(node).get, queryInfo.nodeSql).foreach(set.add)
-      }
+      val set = nodeMap.keySet.par.flatMap(node => queryNode(projection, node, nodeMap.get(node).get, queryInfo.nodeSql))
       if (queryInfo.nodeSql.equals(queryInfo.finalSql)) {
         set.toList
       } else {
-        // TODO: only do this when we have some post processing predicate: ORDER BY, LIMIT, GROUP BY, COUNT, etc.
+        // TODO: do this when we have some post processing predicate: ORDER BY, LIMIT, GROUP BY, COUNT, etc.
         val mergeDb = H2IndexStorage.createInMemoryDb
         try {
           mergeDb.addAll(projection, null, set.toList)

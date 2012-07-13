@@ -121,13 +121,9 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
       db = getDbConnection
       st = db.createStatement
       st.execute("delete from %s;".format(_tableName))
-    }
-    catch {
-      case e: SQLException => {
-        H2IndexStorage.log.error(e)
-      }
-    }
-    finally {
+    } catch {
+      case e: SQLException => H2IndexStorage.log.error(e)
+    } finally {
       SqlUtil.SafeClose(st)
       SqlUtil.SafeClose(db)
     }
@@ -151,9 +147,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
   }
 
   private def createColumn(projection: Projection, db: Connection, tableName: String, colName: String, colVal: AnyRef) : Boolean = {
-    if (colName.length > 32) {
-      return false
-    }
+    if (colName.length > 32) return false
 
     _tableColumns.synchronized {
       if (!_tableColumns.contains(colName)) {
@@ -198,62 +192,6 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     true
   }
 
-  private def add(projection: Projection, nodeIds: Set[Int], db: Connection, tableName:String, record: Record) : String = {
-    var statement: PreparedStatement = null
-    try {
-      val colMap = record.colMap.filter{ (col: (String, AnyRef)) =>
-        (_tableColumns.contains(col._1) || createColumn(projection, db, tableName, col._1, record.colMap.get(col._1).get))
-      }
-      if (colMap.size == 0) throw new IllegalArgumentException("filtered colMap has no data to index")
-      val cols = colMap.keySet
-
-      val sql = "MERGE INTO %s (HASH,RAWDATA,%s) VALUES (?,?,%s);".format(
-        tableName,
-        cols.mkString(","),
-        List.fill(cols.size)("?").mkString(","))
-
-      statement = db.prepareStatement(sql)
-      bind(statement, 1, record.id)
-      bind(statement, 2, record.rawData.toString)
-
-      var idx = 3
-      cols.foreach{ colName =>
-        bind(statement, idx, colMap.get(colName).get)
-        idx += 1
-      }
-
-      statement.execute
-      record.id
-    }
-    catch {
-      case e: Exception => {
-        e.printStackTrace()
-        H2IndexStorage.log.error(e)
-        null
-      }
-    }
-    finally {
-      SqlUtil.SafeClose(statement)
-    }
-  }
-
-  private def remove(db: Connection, hash: String) {
-    var statement: PreparedStatement = null
-    try {
-      statement = db.prepareStatement("DELETE FROM %s WHERE HASH = ?;".format(_tableName))
-      bind(statement, 1, hash)
-      statement.execute
-    }
-    catch {
-      case e: Exception => {
-        H2IndexStorage.log.error(e)
-      }
-    }
-    finally {
-      SqlUtil.SafeClose(statement)
-    }
-  }
-
   private def bind(statement: PreparedStatement, idx: Int, obj: AnyRef) {
     if (obj.isInstanceOf[String]) {
       statement.setString(idx, obj.asInstanceOf[String])
@@ -263,124 +201,101 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
       statement.setInt(idx, obj.asInstanceOf[Int])
     } else if (obj.isInstanceOf[Boolean]) {
       statement.setBoolean(idx, obj.asInstanceOf[Boolean])
-    }
-    else {
+    } else {
       throw new IllegalArgumentException("unknown obj type: " + obj.toString)
     }
   }
 
-  def add(projection: Projection, nodeIds: Set[Int], datum: Record) : String = {
-    if (datum == null) return null
-    var db: Connection = null
-    try {
-      db = getDbConnection
-      add(projection, nodeIds, db, _tableName, datum)
-    }
-    catch {
-      case e: JSONException => {
-        H2IndexStorage.log.error(e)
-        null
-      }
-      case e: SQLException => {
-        H2IndexStorage.log.error(e)
-        null
-      }
-    }
-    finally {
-      SqlUtil.SafeClose(db)
-    }
-  }
-
   def addAll(projection: Projection, nodeIdMap: Map[Int, Set[String]], recordMap: Map[String, Record]) : List[String] = {
-    if (recordMap == null) return null
+    addAll(projection, nodeIdMap, recordMap.values.toList)
+  }
 
+  def addAll(projection: Projection, nodeIdMap: Map[Int, Set[String]], records: List[Record]) : List[String] = {
     var db: Connection = null
+    var statement: PreparedStatement = null
+
     try {
       db = getDbConnection
       db.setAutoCommit(false)
 
-      recordMap.values.foreach{ record =>
-        if (record.colMap == null) {
-          add(projection, null, db,_tableName, Record.create(record.id, record.rawData))
-        } else {
-          add(projection, null, db,_tableName, record)
+      var i = 0
+
+      val ids = records.map{ orec =>
+        val record = if (orec.colMap == null) { Record.create(orec.id, orec.rawData) } else { orec }
+        val colMap = record.colMap.filter{ (col: (String, AnyRef)) =>
+          (_tableColumns.contains(col._1) || createColumn(projection, db, _tableName, col._1, record.colMap.get(col._1).get))
+        }
+        if (colMap.size == 0) throw new IllegalArgumentException("filtered colMap has no data to index")
+        val cols = colMap.keySet.toList
+
+        val sql = "MERGE INTO %s (HASH,RAWDATA,%s) VALUES (?,?,%s);".format(
+          _tableName,
+          cols.mkString(","),
+          List.fill(cols.size)("?").mkString(","))
+
+        statement = db.prepareStatement(sql)
+        bind(statement, 1, record.id)
+        bind(statement, 2, record.rawData.toString)
+        (0 until cols.size).foreach(idx => bind(statement, idx, colMap.get(cols(3 + idx)).get))
+
+        statement.addBatch
+
+        i += 1
+        if (i > 1024) {
+          statement.executeBatch()
+          i = 0
+        }
+
+        record.id
+      }
+
+      statement.executeBatch()
+
+      db.commit
+      ids
+    } catch {
+      case e: JSONException => { H2IndexStorage.log.error(e); null }
+      case e: SQLException => { H2IndexStorage.log.error(e); null }
+    } finally {
+      SqlUtil.SafeClose(statement)
+      SqlUtil.SafeClose(db)
+    }
+  }
+
+  def remove(projection: Projection, nodeIds: Set[Int], ids: List[String]) {
+    var db: Connection = null
+    var statement: PreparedStatement = null
+
+    try {
+      db = getDbConnection
+      db.setAutoCommit(false)
+
+      statement = db.prepareStatement("DELETE FROM %s WHERE HASH = ?;".format(_tableName))
+
+      var i = 0
+
+      ids.foreach{ id =>
+        bind(statement, 1, id)
+
+        i += 1
+        if (i > 1024) {
+          statement.executeBatch()
+          i = 0
         }
       }
 
-      db.commit
+      statement.executeBatch()
 
-      recordMap.keySet.toList
-    }
-    catch {
-      case e: JSONException => {
-        H2IndexStorage.log.error(e)
-        null
-      }
-      case e: SQLException => {
-        H2IndexStorage.log.error(e)
-        null
-      }
-    }
-    finally {
+      db.commit
+    } catch {
+      case e: JSONException => H2IndexStorage.log.error(e)
+      case e: SQLException => H2IndexStorage.log.error(e)
+    } finally {
+      SqlUtil.SafeClose(statement)
       SqlUtil.SafeClose(db)
     }
   }
 
-  def addAll(projection: Projection, nodeIds: Set[Int], data: List[Record]) : List[String] = {
-    if (data == null) return null
-    var db: Connection = null
-    try {
-      db = getDbConnection
-      db.setAutoCommit(false)
-      data.foreach{ record =>
-        if (record.colMap == null) {
-          add(projection, nodeIds, db,_tableName, Record.create(record.id, record.rawData))
-        } else {
-          add(projection, nodeIds, db,_tableName, record)
-        }
-      }
-      db.commit
-      null // TODO: fix
-    }
-    catch {
-      case e: JSONException => {
-        H2IndexStorage.log.error(e)
-        null
-      }
-      case e: SQLException => {
-        H2IndexStorage.log.error(e)
-        null
-      }
-    }
-    finally {
-      SqlUtil.SafeClose(db)
-    }
-  }
-
-  def remove(projection: Projection, nodeIds: Set[Int], id: String) {
-    var db: Connection = null
-    try {
-      db = getDbConnection
-      db.setAutoCommit(false)
-      remove(db, id)
-      db.commit
-    }
-    catch {
-      case e: JSONException => {
-        e.printStackTrace
-        H2IndexStorage.log.error(e)
-      }
-      case e: SQLException => {
-        H2IndexStorage.log.error(e)
-      }
-    }
-    finally {
-      SqlUtil.SafeClose(db)
-    }
-  }
-
-  // BUG: if sql is not select * then we may not get HASH,RAWDATA back
-  // TODO: we should really be building our queries for the caller so they dont need to know the inner details
   def query(projection: Projection, nodeIds: Set[Int], sql: String): List[Record] = {
     val results = new ListBuffer[Record]
 
@@ -391,20 +306,14 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
       statement = db.prepareStatement(sql)
       val rs: ResultSet = statement.executeQuery
       while (rs.next) results.append(new Record(rs.getString("HASH"), null, new JSONObject(rs.getString("RAWDATA"))))
-    }
-    catch {
-      case e: JSONException => {
-        e.printStackTrace
-        H2IndexStorage.log.error(e)
-      }
-      case e: SQLException => {
-        H2IndexStorage.log.error(e)
-      }
-    }
-    finally {
+    } catch {
+      case e: JSONException => H2IndexStorage.log.error(e)
+      case e: SQLException => H2IndexStorage.log.error(e)
+    } finally {
       SqlUtil.SafeClose(statement)
       SqlUtil.SafeClose(db)
     }
+
     results.toList
   }
 }

@@ -103,10 +103,8 @@ class HttpIndexStorage(host: String) extends IndexStorage
     }
   }
 
-  def remove(projection: Projection, nodeIds: Set[Int], id: String)
-  {}
+  def remove(projection: Projection, nodeIds: Set[Int], ids: List[String]) {}
 }
-
 
 object HttpIndexStorage
 {

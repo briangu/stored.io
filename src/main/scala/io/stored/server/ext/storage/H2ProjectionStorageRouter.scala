@@ -34,16 +34,12 @@ class H2ProjectionStorageRouter(configRoot: String) extends IndexStorage {
     getProjStore(projection.name).query(projection, nodeIds, sql)
   }
 
-  def add(projection: Projection, nodeIds: Set[Int], record: Record): String = {
-    getProjStore(projection.name).add(projection, nodeIds, record)
-  }
-
   def addAll(projection: Projection, nodeIdMap: Map[Int, Set[String]], recordMap: Map[String, Record]): List[String] = {
     getProjStore(projection.name).addAll(projection, nodeIdMap, recordMap)
   }
 
-  def remove(projection: Projection, nodeIds: Set[Int], id: String) {
-    getProjStore(projection.name).remove(projection, nodeIds, id)
+  def remove(projection: Projection, nodeIds: Set[Int], ids: List[String]) {
+    getProjStore(projection.name).remove(projection, nodeIds, ids)
   }
 
   def getProjStore(projectionName: String) : IndexStorage = {
