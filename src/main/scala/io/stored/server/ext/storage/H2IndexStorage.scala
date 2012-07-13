@@ -10,20 +10,21 @@ import io.stored.common.SqlUtil
 import collection.mutable.{ListBuffer, SynchronizedSet, HashSet}
 import io.stored.server.common.{Projection, Record, IndexStorage}
 import java.util.UUID
+import collection.parallel.mutable
 
 
 object H2IndexStorage {
   private val log: Logger = Logger.getLogger(classOf[H2IndexStorage])
 
   def createInMemoryDb : H2IndexStorage = {
-    val storage = new H2IndexStorage("mem:%s".format(UUID.randomUUID().toString.replace("-","")))
-    storage.init()
+    val storage = new H2IndexStorage("mem:%s".format(UUID.randomUUID.toString.replace("-","")))
+    storage.init
     storage
   }
 
   def create(configRoot: String) : IndexStorage = {
     val storage = new H2IndexStorage(configRoot)
-    storage.init()
+    storage.init
     storage
   }
 }
@@ -47,11 +48,11 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
 
   def isMemoryDb = configRoot.startsWith("mem:")
 
-  def init() {
+  def init {
     Class.forName("org.h2.Driver")
     _cp = JdbcConnectionPool.create(createConnectionString, "sa", "sa")
 
-    if (isMemoryDb || new File(getDbFile + ".h2.db").exists() != true) {
+    if (isMemoryDb || new File(getDbFile + ".h2.db").exists != true) {
       bootstrapDb
     }
 
@@ -209,14 +210,13 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
 
   def addAll(projection: Projection, nodeIdMap: Map[Int, Set[String]], records: List[Record]) : List[String] = {
     var db: Connection = null
-    var statement: PreparedStatement = null
+    var statementMap = new collection.mutable.HashMap[String, PreparedStatement]
 
     try {
       db = getDbConnection
       db.setAutoCommit(false)
 
       var i = 0
-      var lastSql : String = null
 
       val ids = records.map{ orec =>
         val record = if (orec.colMap == null) { Record.create(orec.id, orec.rawData) } else { orec }
@@ -231,14 +231,10 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
           cols.mkString(","),
           List.fill(cols.size)("?").mkString(","))
 
-        if (lastSql == null) {
-          statement = db.prepareStatement(sql)
-        } else if (sql != lastSql) {
-          statement.executeBatch()
-          SqlUtil.SafeClose(statement)
-          statement = db.prepareStatement(sql)
+        if (!statementMap.contains(sql)) {
+          statementMap.put(sql, db.prepareStatement(sql))
         }
-        lastSql = sql
+        val statement = statementMap.get(sql).get
 
         bind(statement, 1, record.id)
         bind(statement, 2, record.rawData.toString)
@@ -248,14 +244,14 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
 
         i += 1
         if (i > 1024) {
-          statement.executeBatch()
+          statementMap.values.foreach(_.executeBatch)
           i = 0
         }
 
         record.id
       }
 
-      statement.executeBatch()
+      statementMap.values.foreach(_.executeBatch)
 
       db.commit
       ids
@@ -263,7 +259,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
       case e: JSONException => { H2IndexStorage.log.error(e); null }
       case e: SQLException => { H2IndexStorage.log.error(e); null }
     } finally {
-      SqlUtil.SafeClose(statement)
+      statementMap.values.foreach(SqlUtil.SafeClose)
       SqlUtil.SafeClose(db)
     }
   }
@@ -285,12 +281,12 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
 
         i += 1
         if (i > 1024) {
-          statement.executeBatch()
+          statement.executeBatch
           i = 0
         }
       }
 
-      statement.executeBatch()
+      statement.executeBatch
 
       db.commit
     } catch {
