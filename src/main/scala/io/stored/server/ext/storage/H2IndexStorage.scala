@@ -10,7 +10,6 @@ import io.stored.common.SqlUtil
 import collection.mutable.{ListBuffer, SynchronizedSet, HashSet}
 import io.stored.server.common.{Projection, Record, IndexStorage}
 import java.util.UUID
-import collection.parallel.mutable
 
 
 object H2IndexStorage {
@@ -131,7 +130,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     var statement: PreparedStatement = null
     try {
       val sql = "CREATE INDEX %s_%s ON %s (%s)".format(tableName, colName, tableName, colName)
-      println(sql)
+      H2IndexStorage.log.info(sql)
       statement = db.prepareStatement(sql)
       statement.execute
     } catch {
@@ -162,11 +161,11 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
           } else if (colVal.isInstanceOf[Boolean]) {
             colType = "BOOLEAN"
           } else {
-            println(colName + " " + colVal.getClass.toString)
+            H2IndexStorage.log.info(colName + " " + colVal.getClass.toString)
             throw new IllegalArgumentException("unknown obj type: " + colVal.getClass.toString)
           }
 
-          println("adding colname: " + colName + " of type " + colType)
+          H2IndexStorage.log.info("adding colname: " + colName + " of type " + colType)
 
           val sql = "ALTER TABLE %s ADD %s %s NULL".format(tableName, colName, colType)
 

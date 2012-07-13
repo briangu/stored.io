@@ -21,7 +21,7 @@ object Record {
         flatten(ref.asInstanceOf[JSONObject], refPath + "__", map)
       } else if (ref.isInstanceOf[JSONArray]) {
         // TODO: make this work
-        println("skipping jsonarray for key: " + refPath)
+//        println("skipping jsonarray for key: " + refPath)
       } else {
         if (ref.isInstanceOf[String]
             || ref.isInstanceOf[Long]
