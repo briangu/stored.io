@@ -23,11 +23,11 @@ class H2ProjectionStorageRouter(configRoot: String) extends IndexStorage {
   def init() {}
 
   def shutdown() {
-    _projections.values.foreach(_.shutdown)
+    _projections.values.par.foreach(_.shutdown)
   }
 
   def purge() {
-    _projections.values.foreach(_.purge)
+    _projections.values.par.foreach(_.purge)
   }
 
   def query(projection: Projection, nodeIds: Set[Int], sql: String): List[Record] = {
