@@ -1,1 +1,1 @@
-sql=select%20%2A%20from%20cars%20where%20seat.material%20%3D%20%27leather%27
+sql=select%20seat:safety:rating%20from%20cars%20where%20seat:material%20%3D%20%27leather%27
