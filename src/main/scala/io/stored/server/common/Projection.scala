@@ -3,6 +3,7 @@ package io.stored.server.common
 import org.json.JSONObject
 import collection.immutable._
 import collection.mutable.{LinkedHashMap, SynchronizedMap, SynchronizedSet, HashMap}
+import collection.mutable
 
 
 class Projection(
@@ -11,29 +12,24 @@ class Projection(
   fields: collection.mutable.LinkedHashMap[String, ProjectionField],
   val allNodeIds: Set[Int],
   val localNodeIds: Set[Int],
-  val nodeHostMap: Map[Int, IndexStorage]) {
+  val nodeHostMap: Map[Int, IndexStorage],
+  val nodes : List[IndexStorage]) {
 
   def getFields = fields.keySet
   def getFieldValue(key: String) = fields.get(key).get
 
   def getNodeStores(nodeIds: Set[Int]) : Map[IndexStorage, Set[Int]] = {
-    val nodeMap = new HashMap[IndexStorage, collection.mutable.HashSet[Int] with SynchronizedSet[Int]] //with SynchronizedMap[IndexStorage, HashSet[Int] with SynchronizedSet[Int]]
-    nodeIds.par.foreach { id =>
+/*
+    var x : Map[IndexStorage, Set[Int]] = nodes.flatMap(is => Map(is -> Set[Int]())).toMap
+    nodeIds.par.foreach{ id =>
       val node = nodeHostMap.get(id).get
-      if (!nodeMap.contains(node)) {
-        nodeMap.synchronized {
-          if (!nodeMap.contains(node)) {
-            nodeMap.put(node, new collection.mutable.HashSet[Int] with SynchronizedSet[Int])
-          }
-        }
-      }
-      nodeMap.get(node).get.add(id)
+      x = x ++ Map(node -> (x.get(node).get + id))
     }
-    nodeMap.toMap
-
-    val resultMap = new HashMap[IndexStorage, Set[Int]]
-    nodeMap.keySet.foreach( key => resultMap.put(key, nodeMap.get(key).get.toSet))
-    resultMap.toMap
+    x
+*/
+    val x = nodes.flatMap(is => Map(is -> new mutable.HashSet[Int])).toMap
+    nodeIds.foreach( id => x.get(nodeHostMap.get(id).get).get.add(id) )
+    x.flatMap{e => if (e._2.size > 0) { Map(e._1 -> e._2.toSet) } else { Nil } }.toMap
   }
 
   def getNodeIndexStorage(nodeId: Int) : IndexStorage = nodeHostMap.get(nodeId).get
@@ -138,6 +134,6 @@ object Projection {
     val localNodeIds = allNodeIds.filter(id => (id % nodesConfig.nodes.size) == nodesConfig.localNodeIndex)
     val nodeMap = allNodeIds.flatMap(id => Map(id -> nodesConfig.hostStorage.get(id % nodesConfig.nodes.size).get))
 
-    new Projection(name, dimensions, fieldMap, allNodeIds, localNodeIds.toSet, nodeMap.toMap)
+    new Projection(name, dimensions, fieldMap, allNodeIds, localNodeIds.toSet, nodeMap.toMap, nodesConfig.nodes)
   }
 }
