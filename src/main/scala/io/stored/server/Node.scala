@@ -39,7 +39,7 @@ class Node(val localNode : IndexStorage, val projections: ProjectionsConfig) {
 
     val selSet = selectedItems.toSet
     records.flatMap { record =>
-      if (record.colMap.keySet.intersect(selSet).size > 0) {
+      if (record.colMap == null || record.colMap.keySet.intersect(selSet).size > 0) {
         val dst = new JSONObject()
         selectedItems.foreach(rawPath => copyJsonObjectPath(record.rawData, dst, rawPath.split("__").toList))
         List(new Record(record.id, null, dst))

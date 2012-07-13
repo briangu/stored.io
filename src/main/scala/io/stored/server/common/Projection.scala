@@ -2,7 +2,7 @@ package io.stored.server.common
 
 import org.json.JSONObject
 import collection.immutable._
-import collection.mutable.{LinkedHashMap, SynchronizedMap, SynchronizedSet, HashMap}
+import collection.mutable.{LinkedHashMap, SynchronizedMap, SynchronizedSet}
 
 
 class Projection(
@@ -17,49 +17,29 @@ class Projection(
   def getFieldValue(key: String) = fields.get(key).get
 
   def getNodeStores(nodeIds: Set[Int]) : Map[IndexStorage, Set[Int]] = {
-    val nodeMap = new HashMap[IndexStorage, collection.mutable.HashSet[Int] with SynchronizedSet[Int]] //with SynchronizedMap[IndexStorage, HashSet[Int] with SynchronizedSet[Int]]
-    nodeIds.par.foreach { id =>
-      val node = nodeHostMap.get(id).get
-      if (!nodeMap.contains(node)) {
-        nodeMap.synchronized {
-          if (!nodeMap.contains(node)) {
-            nodeMap.put(node, new collection.mutable.HashSet[Int] with SynchronizedSet[Int])
-          }
-        }
-      }
-      nodeMap.get(node).get.add(id)
-    }
-    nodeMap.toMap
-
-    val resultMap = new HashMap[IndexStorage, Set[Int]]
-    nodeMap.keySet.foreach( key => resultMap.put(key, nodeMap.get(key).get.toSet))
-    resultMap.toMap
+    nodeIds.flatMap(id => Map(nodeHostMap.get(id).get -> Set(id))).toMap
   }
 
   def getNodeIndexStorage(nodeId: Int) : IndexStorage = nodeHostMap.get(nodeId).get
 
-  // TODO: there must be a better way to async accumulate key->values
   def getRecordCoords(data: Map[String, AnyRef]) : Map[String, List[BigInt]] = {
-    val result = new collection.mutable.HashMap[String, List[BigInt]] with SynchronizedMap[String, List[BigInt]]
-    data.keySet.par.foreach{ key =>
-      if (data.contains(key)) {
-        val dataVal = data.get(key).get
+    data.keySet.flatMap{ key =>
+      val dataVal = data.get(key).get
 
-        if (dataVal.isInstanceOf[Long]) {
-          result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[Long])))
-        } else if (dataVal.isInstanceOf[java.lang.Integer]) {
-          result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[java.lang.Integer])))
-        } else if (dataVal.isInstanceOf[String]) {
-          result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[String])))
-        } else if (dataVal.isInstanceOf[Double]) {
-          result.put(key, List(ProjectionField.md5Hash(dataVal.asInstanceOf[Double])))
-        } else {
-          // println("not hashing col: " + key)
-          // skip fields we can't hash
-        }
+      if (dataVal.isInstanceOf[Long]) {
+        Map(key -> List(ProjectionField.md5Hash(dataVal.asInstanceOf[Long])))
+      } else if (dataVal.isInstanceOf[java.lang.Integer]) {
+        Map(key -> List(ProjectionField.md5Hash(dataVal.asInstanceOf[java.lang.Integer])))
+      } else if (dataVal.isInstanceOf[String]) {
+        Map(key -> List(ProjectionField.md5Hash(dataVal.asInstanceOf[String])))
+      } else if (dataVal.isInstanceOf[Double]) {
+        Map(key -> List(ProjectionField.md5Hash(dataVal.asInstanceOf[Double])))
+      } else {
+        // println("not hashing col: " + key)
+        // skip fields we can't hash
+        Nil
       }
-    }
-    result.toMap
+    }.toMap
   }
 
   def getNodeIds(record: Record) : Set[Int] = {
@@ -73,20 +53,19 @@ class Projection(
     if (intersection.size == 0) return allNodeIds
 
     // fill each project field with all appropriate values
-    val fieldMap = new collection.mutable.HashMap[String, List[BigInt]]
-    getFields.foreach{ key =>
+    val fieldMap = getFields.flatMap{ key =>
       if (hashCoords.contains(key)) {
-        fieldMap.put(key, hashCoords.get(key).get)
+        Map(key -> hashCoords.get(key).get)
       } else {
-        fieldMap.put(key, genFieldValues(getFieldValue(key).bitWeight))
+        Map(key -> genFieldValues(getFieldValue(key).bitWeight))
       }
-    }
+    }.toMap
 
     val fieldList = getFields.toList
 
     // generate all possible nodeIds using the fieldMap
     val nodeIds = new collection.mutable.HashSet[Int]
-    genNodeIds(fieldList, fieldMap.toMap, nodeIds, 0)
+    genNodeIds(fieldList, fieldMap, nodeIds, 0)
     nodeIds.toSet
   }
 
@@ -139,13 +118,9 @@ object Projection {
 
     val allNodeIds = determineAllNodeIds(dimensions)
 
-    val localNodeIds = new collection.mutable.HashSet[Int] with SynchronizedSet[Int]
-    val nodeMap = new collection.mutable.HashMap[Int, IndexStorage] with SynchronizedMap[Int, IndexStorage]
-    allNodeIds.par.foreach{id =>
-      val mod = id % nodesConfig.nodes.size
-      if (mod == nodesConfig.localNodeIndex) localNodeIds.add(id)
-      nodeMap.put(id, nodesConfig.hostStorage.get(mod).get)
-    }
+    // TODO: we should be using a hamming distance function not mod (or use a strategy plugin)
+    val localNodeIds = allNodeIds.filter(id => (id % nodesConfig.nodes.size) == nodesConfig.localNodeIndex)
+    val nodeMap = allNodeIds.flatMap(id => Map(id -> nodesConfig.hostStorage.get(id % nodesConfig.nodes.size).get))
 
     new Projection(name, dimensions, fieldMap, allNodeIds, localNodeIds.toSet, nodeMap.toMap)
   }
