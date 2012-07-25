@@ -111,12 +111,6 @@ class Node(val localNode : IndexStorage, val projections: ProjectionsConfig) {
   }
 
   private def doQuery(queryInfo: QueryInfo, projection: Projection, nodeMap: Map[IndexStorage, Set[Int]], nodeIds: Set[Int]) : List[Record] = {
-    //        println("nodeSql: " + queryInfo.nodeSql)
-
-    // TODO: we need to apply a final-sql that is generated from the original sql in some cases
-    //       when COUNT is specified in select
-    //       possibly when group-by is specified
-    //       the processSqlRequest should produce a finalSql, which may == nodeSql
     val results = if (nodeMap.keySet.size == 1 && queryInfo.nodeSql.equals(queryInfo.finalSql)) {
       projection.getNodeIndexStorage(nodeIds.toList(0)).query(projection, nodeIds, queryInfo.nodeSql)
     } else {
