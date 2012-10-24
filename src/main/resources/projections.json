@@ -22,22 +22,20 @@
       }
     },
     {
-      "name": "glu",
-      "dimensions": 12,
-      "fields": {
-        "agent": 6,
-        "metadata.container.kind": 2,
-        "metadata.container.name": 2,
-        "mountPoint": 2
-      }
-    },
-    {
       "name": "cloudcmd",
       "dimensions": 12,
       "fields": {
         "fileext": 4,
         "path": 2,
         "filename": 6
+      }
+    },
+    {
+      "name": "stocks",
+      "dimensions": 12,
+      "fields": {
+        "symbol": 6,
+	"date": 6
       }
     }
   ]

@@ -213,7 +213,10 @@ object Node {
               val ids = node.insert(projection, jsonRecords)
               JsonUtil.jsonResponse("id", JsonUtil.toJsonArray(ids))
             } catch {
-              case e: IllegalArgumentException => return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+              case e: IllegalArgumentException => {
+                e.printStackTrace()
+                return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
+              }
             }
           }
         })

@@ -158,9 +158,12 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
             colType = "LONG"
           } else if (colVal.isInstanceOf[Int]) {
             colType = "LONG"
+          } else if (colVal.isInstanceOf[Float] || colVal.isInstanceOf[Double]) {
+            colType = "DOUBLE"
           } else if (colVal.isInstanceOf[Boolean]) {
             colType = "BOOLEAN"
           } else {
+            H2IndexStorage.log.error("unknown filed type: " + colVal.getClass.getName)
             H2IndexStorage.log.info(colName + " " + colVal.getClass.toString)
             throw new IllegalArgumentException("unknown obj type: " + colVal.getClass.toString)
           }
@@ -196,10 +199,16 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
       statement.setLong(idx, obj.asInstanceOf[Long])
     } else if (obj.isInstanceOf[Int]) {
       statement.setInt(idx, obj.asInstanceOf[Int])
+    } else if (obj.isInstanceOf[Float]) {
+      statement.setFloat(idx, obj.asInstanceOf[Float])
+    } else if (obj.isInstanceOf[Double]) {
+      statement.setDouble(idx, obj.asInstanceOf[Double])
     } else if (obj.isInstanceOf[Boolean]) {
       statement.setBoolean(idx, obj.asInstanceOf[Boolean])
     } else {
-      throw new IllegalArgumentException("unknown obj type: " + obj.toString)
+      val msg = "unknown obj type: " + obj.toString
+      H2IndexStorage.log.error(msg)
+      throw new IllegalArgumentException(msg)
     }
   }
 
