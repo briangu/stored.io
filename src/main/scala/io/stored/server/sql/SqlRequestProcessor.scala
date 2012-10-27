@@ -9,6 +9,7 @@ import java.util.Arrays
 import collection.mutable.HashMap
 import net.sf.jsqlparser.statement.select._
 import net.sf.jsqlparser.schema.{Table, Column}
+import java.util
 
 
 class SqlRequestProcessor extends SelectVisitor with ExpressionVisitor
@@ -83,8 +84,23 @@ class SqlRequestProcessor extends SelectVisitor with ExpressionVisitor
     if (!(sqlSelectItems.size() == 1 && sqlSelectItems.get(0).equals("*")))
     {
       (0 until sqlSelectItems.size()).foreach(i => sqlSelectItems.get(i).asInstanceOf[SelectItem].accept(selectItemExtractor))
-      // Node SQL requires *
-      plainSelect.setSelectItems(Arrays.asList("*"))
+
+      // if we are doing a non-distinct call, then overwrite the select items and filter on the collect phase
+      if (plainSelect.getDistinct == null) {
+        // Node SQL requires *
+        plainSelect.setSelectItems(Arrays.asList("*"))
+      } else {
+        val newSelectItems = new java.util.ArrayList[String]()
+        import collection.JavaConversions._
+
+        sqlSelectItems.foreach{item => {
+          newSelectItems.add(item.toString)
+        }}
+
+        if (!newSelectItems.contains("HASH")) newSelectItems.add("HASH")
+        if (!newSelectItems.contains("RAWDATA")) newSelectItems.add("RAWDATA")
+        plainSelect.setSelectItems(newSelectItems)
+      }
     }
 
     selectItems = selectItemExtractor.selectItems.toList

@@ -2,14 +2,14 @@ package io.stored.server.ext.storage
 
 import org.apache.log4j.Logger
 import org.h2.jdbcx.JdbcConnectionPool
-import org.json.JSONException
-import org.json.JSONObject
+import org.json.{JSONArray, JSONException, JSONObject}
 import java.io.File
 import java.sql._
 import io.stored.common.SqlUtil
 import collection.mutable.{ListBuffer, SynchronizedSet, HashSet}
 import io.stored.server.common.{Projection, Record, IndexStorage}
 import java.util.UUID
+import collection.mutable
 
 
 object H2IndexStorage {
@@ -312,7 +312,7 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     var db: Connection = null
     var statement: PreparedStatement = null
     try {
-      db = getReadOnlyDbConnection
+      db = getDbConnection
       statement = db.prepareStatement(sql)
       val rs: ResultSet = statement.executeQuery
       while (rs.next) results.append(new Record(rs.getString("HASH"), null, new JSONObject(rs.getString("RAWDATA"))))
@@ -325,5 +325,40 @@ class H2IndexStorage(configRoot: String) extends IndexStorage {
     }
 
     results.toList
+  }
+
+  def jsonQuery(projection: Projection, nodeIds: Set[Int], sql: String): String = {
+    val results = new mutable.StringBuilder
+
+    val time = System.currentTimeMillis()
+    var db: Connection = null
+    var statement: PreparedStatement = null
+    try {
+      db = getDbConnection
+
+//      createIndex(db, _tableName, "CLOSE")
+
+      statement = db.prepareStatement(sql)
+      val rs: ResultSet = statement.executeQuery
+      println("query took: %d".format(System.currentTimeMillis() - time))
+      results.append("{\"results\":[");
+      while (rs.next) {
+        results.append(rs.getString("RAWDATA"))
+        if (!rs.isLast()) {
+          results.append(",")
+        }
+      }
+      results.append("]}")
+    } catch {
+      case e: JSONException => H2IndexStorage.log.error(e)
+      case e: SQLException => H2IndexStorage.log.error(e)
+    } finally {
+      SqlUtil.SafeClose(statement)
+      SqlUtil.SafeClose(db)
+    }
+
+    println("took: %d".format(System.currentTimeMillis() - time))
+
+    results.toString
   }
 }

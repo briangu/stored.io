@@ -1,11 +1,13 @@
 package io.stored.server.common
 
+
 trait IndexStorage {
   def init()
   def shutdown()
 
   def purge()
 
+  def jsonQuery(projection: Projection, nodeIds: Set[Int], sql: String) : String
   def query(projection: Projection, nodeIds: Set[Int], sql: String) : List[Record]
 
   def add(projection: Projection, nodeIdMap: Map[Int, Set[String]], record: Record) : String = {

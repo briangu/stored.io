@@ -2,6 +2,7 @@ package io.stored.server.ext.storage
 
 import io.stored.server.common.{Record, Projection, IndexStorage}
 import collection.mutable.{SynchronizedMap, HashMap}
+import org.json.JSONArray
 
 /***
  * This is an experimental IndexStorage that creates a new DB for each projection.
@@ -32,6 +33,10 @@ class H2ProjectionStorageRouter(configRoot: String) extends IndexStorage {
 
   def query(projection: Projection, nodeIds: Set[Int], sql: String): List[Record] = {
     getProjStore(projection.name).query(projection, nodeIds, sql)
+  }
+
+  def jsonQuery(projection: Projection, nodeIds: Set[Int], sql: String) : String = {
+    getProjStore(projection.name).jsonQuery(projection, nodeIds, sql)
   }
 
   def addAll(projection: Projection, nodeIdMap: Map[Int, Set[String]], recordMap: Map[String, Record]): List[String] = {

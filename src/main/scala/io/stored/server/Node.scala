@@ -4,11 +4,12 @@ import _root_.io.viper.core.server.router._
 import common._
 import ext.storage.H2IndexStorage
 import io.viper.common.{NestServer, RestServer}
-import org.jboss.netty.handler.codec.http.HttpResponseStatus
+import org.jboss.netty.handler.codec.http._
 import org.json.{JSONArray, JSONObject}
 import net.sf.jsqlparser.JSQLParserException
 import collection.immutable._
 import sql.QueryInfo
+import org.jboss.netty.buffer.ChannelBuffers
 
 
 class Node(val localNode : IndexStorage, val projections: ProjectionsConfig) {
@@ -47,6 +48,24 @@ class Node(val localNode : IndexStorage, val projections: ProjectionsConfig) {
         Nil
       }
     }
+  }
+
+  def applyJsonSelectItems(selectedItems: List[String], records: JSONArray) : JSONArray = {
+    if (selectedItems == null || selectedItems.size == 0 || selectedItems(0).equals("*")) return records
+
+    /*
+        val selSet = selectedItems.map(_.toUpperCase).toSet
+        (0 until records.length()).flatMap { record =>
+          if (record.colMap == null || record.colMap.keySet.intersect(selSet).size > 0) {
+            val dst = new JSONObject()
+            selectedItems.foreach(rawPath => copyJsonObjectPath(record.rawData, dst, rawPath.split("__").toList))
+            if (dst.length > 0) { List(new Record(record.id, null, dst)) } else { Nil }
+          } else {
+            Nil
+          }
+        }
+    */
+    records
   }
 
   def insert(projectionName: String, record: JSONObject) : String = {
@@ -129,6 +148,30 @@ class Node(val localNode : IndexStorage, val projections: ProjectionsConfig) {
     }
 
     applySelectItems(queryInfo.selectedItems, results)
+  }
+
+  private def doJsonQuery(queryInfo: QueryInfo, projection: Projection, nodeMap: Map[IndexStorage, Set[Int]], nodeIds: Set[Int]) : String = {
+    val results = projection.getNodeIndexStorage(nodeIds.toList(0)).jsonQuery(projection, nodeIds, queryInfo.nodeSql)
+/*
+    val results = if (nodeMap.keySet.size == 1 && queryInfo.nodeSql.equals(queryInfo.finalSql)) {
+      projection.getNodeIndexStorage(nodeIds.toList(0)).jsonQuery(projection, nodeIds, queryInfo.nodeSql)
+    } else {
+      val qr = nodeMap.keySet.par.flatMap(node => node.query(projection, nodeMap.get(node).get, queryInfo.nodeSql)).toList
+      if (queryInfo.postSqlRequired) {
+        val mergeDb = H2IndexStorage.createInMemoryDb
+        try {
+          mergeDb.addAll(projection, null, qr)
+          mergeDb.query(projection, nodeIds, queryInfo.finalSql)
+        } finally {
+          mergeDb.shutdown()
+        }
+      } else {
+        qr
+      }
+    }
+*/
+
+    results
   }
 
   private def getRequestedProjection(args: java.util.Map[String, String], defaultProjName: String) : Projection = {
@@ -233,17 +276,22 @@ object Node {
                 val nodeIds = JsonUtil.intSetFromJsonArray(args.get("nodeIds"))
                 val nodeMap = Map(node.localNode -> nodeIds)
                 val queryInfo = new QueryInfo(projection.name, nodeSql, nodeSql, List(), Map(), false)
-                node.doQuery(queryInfo, projection, nodeMap, nodeIds)
+                node.doJsonQuery(queryInfo, projection, nodeMap, nodeIds)
               } else {
                 val queryInfo = QueryInfo.create(args.get("sql"))
                 val projection = node.getRequestedProjection(args, queryInfo.projectionName)
                 if (projection == null) return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
                 val nodeIds = projection.getNodeIds(queryInfo.whereItems)
                 val nodeMap = projection.getNodeStores(nodeIds)
-                node.doQuery(queryInfo, projection, nodeMap, nodeIds)
+                node.doJsonQuery(queryInfo, projection, nodeMap, nodeIds)
               }
 
-              JsonUtil.jsonResponse("records", JsonUtil.toJsonArray(results, { record: Record => record.rawData }))
+              val time = System.currentTimeMillis()
+              val response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+              response.setHeader(HttpHeaders.Names.CONTENT_TYPE, "application/javascript; charset=UTF-8")
+              response.setContent(ChannelBuffers.wrappedBuffer(results.getBytes("UTF-8")))
+              println("encoding time: %d".format(System.currentTimeMillis() - time))
+              new RouteResponse(response)
             } catch {
               case e: JSQLParserException => return new StatusResponse(HttpResponseStatus.BAD_REQUEST)
             }

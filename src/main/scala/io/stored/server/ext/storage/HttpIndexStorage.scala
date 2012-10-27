@@ -47,6 +47,10 @@ class HttpIndexStorage(host: String) extends IndexStorage
     }
   }
 
+  def jsonQuery(projection: Projection, nodeIds: Set[Int], sql: String) : String = {
+    ""
+  }
+
   def add(projection: Projection, nodeIds: Set[Int], record: Record) : String = {
     val response = asyncHttpClient
       .preparePost("%s/records".format(host))
