@@ -1,6 +1,5 @@
 package io.stored.server.common
 
-import util.parsing.json.JSONObject
 import java.security.MessageDigest
 
 class ProjectionField(val name: String, val bitWeight: Int) {
@@ -22,13 +21,10 @@ object ProjectionField {
     BigInt.apply(digest)
   }
 
-  def create(name: String, obj: Object) : ProjectionField = {
-    if (obj.isInstanceOf[Int]) {
-      new ProjectionField(name, obj.asInstanceOf[Int])
-    } else if (obj.isInstanceOf[JSONObject]) {
-      throw new RuntimeException("obj type not supported")
-    } else {
-      throw new RuntimeException("obj type not supported")
+  def create(name: String, obj: Any) : ProjectionField = {
+    obj match {
+      case x: Int => new ProjectionField(name, x)
+      case _ => throw new RuntimeException("obj type not supported")
     }
   }
 }
